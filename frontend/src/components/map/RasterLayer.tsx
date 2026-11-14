@@ -6,8 +6,8 @@ const SOURCE = "raster-src";
 const LAYER = "raster-layer";
 
 /**
- * XYZ raster layer for before/after/difference. The backend still answers 501 for
- * tile routes, so callers pass `undefined` and nothing is drawn.
+ * XYZ raster layer for before/after/difference/mask. Pass
+ * `changesService.tileTemplate(changeId, layer)`; `undefined` draws nothing.
  */
 export function RasterLayer({ tilesUrl, opacity = 0.75 }: { tilesUrl?: string; opacity?: number }) {
   const map = useMapInstance();

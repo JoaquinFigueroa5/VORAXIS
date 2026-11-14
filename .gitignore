@@ -21,6 +21,7 @@ dist/
 # Local storage / data
 storage/*
 !storage/.gitkeep
+backend/data/
 *.h5
 *.hdf5
 *.tif

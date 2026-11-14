@@ -1,34 +1,42 @@
-"""Per-change metrics. Names and units are part of the API contract."""
+"""Per-change metrics. Names and units are part of the API contract.
 
-import numpy as np
+Everything except the three `job_*`/threshold values describes the polygon
+itself, not the whole scene.
+"""
 
-from app.core.logging import get_logger
 from app.repositories.change_repository import ChangeRepository
 
-logger = get_logger(__name__)
+SOURCE = "processing/vectorization.py"
 
 
-def record(db, context, event) -> None:
+def record(db, context, event, region) -> None:
     changes = ChangeRepository()
-    valid = ~(context.before.invalid | context.after.invalid) if context.before and context.after else None
-    if context.difference is None or valid is None:
-        return
-
     values = {
-        "mean_absolute_difference": (float(context.difference[valid].mean()), "amplitude"),
-        "std_absolute_difference": (float(context.difference[valid].std()), "amplitude"),
-        "threshold_sigma": (context.threshold_sigma, "sigma"),
-        "changed_pixel_fraction": (context.changed_fraction or 0.0, "fraction"),
-        "changed_area_km2": (event.area_km2 or 0.0, "km2"),
-        "valid_pixel_percentage": (context.valid_pixel_percentage or 0.0, "percent"),
+        # This polygon
+        "mean_change_db": (region.mean_change_db, "dB"),
+        "peak_change_db": (region.peak_change_db, "dB"),
+        "mean_backscatter_before_db": (region.mean_before_db, "dB"),
+        "mean_backscatter_after_db": (region.mean_after_db, "dB"),
+        "changed_area_km2": (region.area_km2, "km2"),
+        "changed_pixel_count": (float(region.pixel_count), "pixels"),
+        # The detection that produced it
+        "detection_threshold_db": (context.threshold_db or 0.0, "dB"),
+        "scene_baseline_shift_db": (context.baseline_db or 0.0, "dB"),
+        "job_changed_pixel_fraction": (context.changed_fraction or 0.0, "fraction"),
+        "job_valid_pixel_percentage": (context.valid_pixel_percentage or 0.0, "percent"),
+    }
+    metadata = {
+        "polarization": context.polarization,
+        "direction": region.direction,
+        "threshold_sigma": context.threshold_sigma,
     }
     for name, (value, unit) in values.items():
         changes.add_metric(
             db,
             change_event_id=event.id,
             metric_name=name,
-            value=value,
+            value=round(float(value), 6),
             unit=unit,
-            source="processing/change_detection.py",
-            metadata={"polarization": context.polarization},
+            source=SOURCE,
+            metadata=metadata,
         )

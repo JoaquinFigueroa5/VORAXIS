@@ -34,6 +34,10 @@ class RasterRepository:
             )
         ).scalar_one_or_none()
 
+    def delete(self, db: Session, asset: RasterAsset) -> None:
+        db.delete(asset)
+        db.flush()
+
     def create(
         self,
         db: Session,

@@ -14,13 +14,21 @@ def run(db, context) -> None:
     if not valid.any():
         raise ProcessingError("no overlapping valid pixels between the two observations")
 
-    difference, flagged, score = algorithm.detect(
-        before.array, after.array, valid, context.threshold_sigma
+    difference, flagged, threshold, baseline = algorithm.detect(
+        before.array,
+        after.array,
+        valid,
+        context.threshold_sigma,
+        units=before.units,
+        smoothing_window=context.smoothing_window,
+        noise_floor_db=context.noise_floor_db,
+        edge_buffer_pixels=context.edge_buffer_pixels,
     )
     flagged = clean_mask(flagged)
 
     context.difference = difference
     context.change_mask = flagged
+    context.threshold_db = threshold
+    context.baseline_db = baseline
     context.changed_fraction = float(flagged.sum() / valid.sum())
     context.valid_pixel_percentage = float(valid.sum() / valid.size * 100.0)
-    context.change_score = score

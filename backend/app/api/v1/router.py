@@ -11,6 +11,7 @@ from app.api.v1.endpoints import (
     locations,
     nisar,
     observations,
+    tiles,
 )
 
 router = APIRouter()
@@ -21,6 +22,7 @@ router.include_router(observations.router)
 router.include_router(analysis.router)
 router.include_router(jobs.router)
 router.include_router(changes.router)
+router.include_router(tiles.router)
 router.include_router(evidence.router)
 router.include_router(auxiliary.router)
 router.include_router(insights.router)

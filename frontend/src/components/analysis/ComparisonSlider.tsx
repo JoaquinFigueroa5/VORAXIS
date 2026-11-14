@@ -4,8 +4,9 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/utils/formatters";
 
 /**
- * Before / after swipe. It needs XYZ tiles, which the API does not serve yet, so
- * the component states that explicitly instead of showing an empty black box.
+ * Before / after swipe. The API now serves the rasters as XYZ tiles
+ * (`changesService.tiles(id)` -> layers.before / layers.after); this component
+ * still expects two image URLs, so it shows a notice until it is wired to them.
  */
 export function ComparisonSlider({
   beforeImage,
@@ -22,7 +23,7 @@ export function ComparisonSlider({
     return (
       <EmptyState
         title="Comparador before / after pendiente"
-        description="Los tiles raster responden 501 en esta fase. El COG de diferencia sí se genera y queda registrado en raster_assets."
+        description="El backend ya sirve los tiles antes / después / diferencia (GET /changes/{id}/tiles). Falta conectar este comparador a esas capas."
       />
     );
   }

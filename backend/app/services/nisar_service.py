@@ -38,9 +38,17 @@ class NisarService:
             raise NotFoundError(f"scene {scene_id} not found")
         return self._to_out(row)
 
-    def sync_from_catalogue(self, db, *, bbox, start, end, max_results: int = 250) -> int:
+    def sync_from_catalogue(
+        self, db, *, bbox, start, end, max_results: int = 250, product_type: str | None = None
+    ) -> int:
         """Pull products from ASF DAAC into `catalog.nisar_scenes`. Returns rows touched."""
-        products = self.client.search(bbox=bbox, start=start, end=end, max_results=max_results)
+        products = self.client.search(
+            bbox=bbox,
+            start=start,
+            end=end,
+            max_results=max_results,
+            processing_level=product_type,
+        )
         count = 0
         for product in products:
             payload = map_asf_product(product)

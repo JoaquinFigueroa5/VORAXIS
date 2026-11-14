@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from app.core.exceptions import NotFoundError, NotImplementedFeature
+from app.core.exceptions import NotFoundError
 from app.repositories.change_repository import ChangeRepository
 from app.repositories.raster_repository import RasterRepository
 from app.schemas.change import ChangeEventOut, ChangeMetricOut
@@ -53,10 +53,3 @@ class ChangeService:
             )
             for metric in self.repo.metrics(db, change_id)
         ]
-
-    def tile(self, db, change_id, z: int, x: int, y: int) -> None:
-        """Raster tiles are generated from COGs in MinIO (phase 5)."""
-        self.get(db, change_id)
-        raise NotImplementedFeature(
-            "raster tiles are not generated yet; the difference COG is available as a raster asset"
-        )

@@ -37,7 +37,3 @@ def get_change(change_id: uuid.UUID, db: DbSession) -> ChangeEventOut:
 def get_metrics(change_id: uuid.UUID, db: DbSession) -> list[ChangeMetricOut]:
     return service.metrics(db, change_id)
 
-
-@router.get("/{change_id}/tiles/{z}/{x}/{y}")
-def get_tile(change_id: uuid.UUID, z: int, x: int, y: int, db: DbSession):
-    return service.tile(db, change_id, z, x, y)

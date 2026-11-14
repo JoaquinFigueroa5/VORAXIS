@@ -46,4 +46,5 @@ class AsfClient:
 
         logger.info("ASF search bbox=%s start=%s end=%s", bbox, start, end)
         results = asf.geo_search(**kwargs)
-        return [dict(product.properties) for product in results]
+        # The footprint lives next to `properties`, not inside it; the mapper needs both.
+        return [{**product.properties, "geometry": product.geometry} for product in results]
