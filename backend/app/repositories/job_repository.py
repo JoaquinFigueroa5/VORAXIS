@@ -27,6 +27,7 @@ class JobRepository:
         location_id,
         before_observation_id,
         after_observation_id,
+        parameters: dict | None = None,
     ) -> ProcessingJob:
         job = ProcessingJob(
             location_id=location_id,
@@ -34,6 +35,7 @@ class JobRepository:
             after_observation_id=after_observation_id,
             status="PENDING",
             progress=0,
+            parameters=parameters,
         )
         db.add(job)
         db.commit()

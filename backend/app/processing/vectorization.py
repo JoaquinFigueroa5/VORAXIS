@@ -138,6 +138,7 @@ def run(db, context) -> None:
         db.add(event)
         db.flush()
         context.change_event_ids.append(event.id)
+        context.change_features[event.id] = region
         metrics.record(db, context, event, region)
 
     context.change_score = max(region.score for region in regions)

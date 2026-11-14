@@ -45,6 +45,9 @@ class JobContext:
     change_score: float | None = None  # strongest per-polygon score of the job
     valid_pixel_percentage: float | None = None
     change_event_ids: list[UUID] = field(default_factory=list)
+    change_features: dict[UUID, Any] = field(default_factory=dict)  # id -> vectorization.Region
+    evidence_sources: dict[str, Any] = field(default_factory=dict)
+    change_types: dict[str, int] = field(default_factory=dict)
 
     @property
     def polarization(self) -> str:

@@ -36,4 +36,3 @@ def get_change(change_id: uuid.UUID, db: DbSession) -> ChangeEventOut:
 @router.get("/{change_id}/metrics", response_model=list[ChangeMetricOut])
 def get_metrics(change_id: uuid.UUID, db: DbSession) -> list[ChangeMetricOut]:
     return service.metrics(db, change_id)
-

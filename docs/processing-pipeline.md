@@ -11,7 +11,7 @@ cada paso, de modo que una cancelación surte efecto entre pasos.
 | `ALIGNMENT` | `alignment.py` + `quality_control.py` | recorta ambas fechas a su intersección; % de píxeles válidos |
 | `CHANGE_DETECTION` | `change_detection.py` + `algorithms/gcov.py` | log-ratio en dB con signo, umbral robusto |
 | `VECTORIZATION` | `vectorization.py` + `metrics.py` | un polígono por región, con score y métricas propios |
-| `EVIDENCE_ANALYSIS` | `evidence/engine.py` | relaciones espacio-temporales |
+| `EVIDENCE_ANALYSIS` | `evidence/engine.py` | consulta USGS/FIRMS/POWER, vincula eventos y propone `change_type` |
 | `EXPORTING` | `raster_export.py` | COG de diferencia y máscara al almacén de objetos |
 
 ## Método de detección (GCOV)
@@ -52,7 +52,8 @@ cuádruple. Es una **intensidad relativa**, no una probabilidad.
 
 ## Salidas
 
-- `analysis.change_events`: geometría, `change_type = 'UNCLASSIFIED'`, área,
+- `analysis.change_events`: geometría, `change_type` tentativo (`POSSIBLE_*` o
+  `UNCLASSIFIED`, ver `docs/data-sources.md`), área,
   `change_score` propio y % válido del job.
 - `analysis.change_metrics`, por polígono: `mean_change_db`, `peak_change_db`,
   `mean_backscatter_before_db`, `mean_backscatter_after_db`, `changed_area_km2`,

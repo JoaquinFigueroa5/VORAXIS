@@ -1,6 +1,6 @@
 import type { Geometry } from "geojson";
 
-export type AuxiliarySource = "USGS" | "FIRMS" | "GPM";
+export type AuxiliarySource = "USGS" | "FIRMS" | "POWER";
 
 export interface AuxiliaryEvent {
   id: string;

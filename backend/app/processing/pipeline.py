@@ -97,6 +97,16 @@ def run(job_id: str, parameters: dict | None = None) -> None:
                 logger.info("job %s step %s", job_id, step)
                 handler(db, context)
 
+            job.result = {
+                "polarization": context.polarization,
+                "change_events": len(context.change_event_ids),
+                "change_types": context.change_types,
+                "threshold_db": context.threshold_db,
+                "baseline_db": context.baseline_db,
+                "changed_pixel_fraction": context.changed_fraction,
+                "valid_pixel_percentage": context.valid_pixel_percentage,
+                "evidence_sources": context.evidence_sources,
+            }
             _update(
                 db,
                 jobs,

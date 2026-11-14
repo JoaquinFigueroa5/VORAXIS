@@ -40,7 +40,8 @@ Base: `http://localhost:8000/api/v1` · OpenAPI: `/docs`.
     "smoothing_window": 5,
     "noise_floor_db": -30,
     "edge_buffer_pixels": 16,
-    "minimum_area_km2": 0.01
+    "minimum_area_km2": 0.01,
+    "fetch_auxiliary": true
   }
 }
 ```
@@ -59,6 +60,9 @@ Respuesta `202`:
 Errores: `404` si falta cualquier entidad, `422` si el par es incompatible
 (mensaje con todos los motivos separados por `;`), `400` por `bbox` o fechas
 inválidas, `409` al cancelar un trabajo ya terminado.
+
+`GET /jobs/{id}` incluye `parameters` (lo que se pidió) y `result` (umbral, conteo por
+`change_type` y estado de cada fuente auxiliar en `evidence_sources`).
 
 ## Tiles raster (mapa y comparador)
 

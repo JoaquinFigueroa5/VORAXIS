@@ -79,17 +79,24 @@ class EvidenceRepository:
         external_id: str | None,
         event_type: str,
         event_date,
-        longitude: float,
-        latitude: float,
+        longitude: float | None = None,
+        latitude: float | None = None,
+        geometry_wkt: str | None = None,
         magnitude: float | None = None,
         metadata: dict | None = None,
     ) -> AuxiliaryEvent:
+        """A point from longitude/latitude, or any geometry (e.g. a grid cell) from WKT."""
+        geometry = (
+            func.ST_GeomFromText(geometry_wkt, 4326)
+            if geometry_wkt
+            else func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326)
+        )
         event = AuxiliaryEvent(
             source=source,
             external_id=external_id,
             event_type=event_type,
             event_date=event_date,
-            geometry=func.ST_SetSRID(func.ST_MakePoint(longitude, latitude), 4326),
+            geometry=geometry,
             magnitude=magnitude,
             extra_metadata=metadata,
         )

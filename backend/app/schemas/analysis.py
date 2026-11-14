@@ -17,6 +17,8 @@ class AnalysisParameters(BaseModel):
     edge_buffer_pixels: int = Field(default=16, ge=0, le=200)
     # Changed areas smaller than this are dropped.
     minimum_area_km2: float = Field(default=0.01, ge=0, le=100)
+    # Query USGS / FIRMS / POWER for the interval between the two acquisitions.
+    fetch_auxiliary: bool = True
 
 
 class AnalysisRequest(BaseModel):

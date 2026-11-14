@@ -94,6 +94,7 @@ class AnalysisService:
             location_id=location.id,
             before_observation_id=before.id,
             after_observation_id=after.id,
+            parameters=request.parameters.model_dump(),
         )
 
         try:
