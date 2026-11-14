@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #0b1220;
+  --color-surface-raised: #111b2e;
+  --color-surface-border: #1e2b45;
+  --color-accent: #38bdf8;
+  --color-accent-soft: #0ea5e9;
+  --color-muted: #8ba0be;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-surface);
+    color: #e2e8f0;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* MapLibre popups and controls on a dark UI */
+  .maplibregl-popup-content {
+    background: var(--color-surface-raised);
+    color: #e2e8f0;
+    border: 1px solid var(--color-surface-border);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  .maplibregl-popup-tip {
+    border-top-color: var(--color-surface-raised) !important;
+    border-bottom-color: var(--color-surface-raised) !important;
+  }
+
+  .maplibregl-ctrl-group {
+    background: var(--color-surface-raised);
+  }
+
+  .maplibregl-ctrl-group button + button {
+    border-top-color: var(--color-surface-border);
+  }
+}

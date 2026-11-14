@@ -1,0 +1,115 @@
+name: spaceapps
+
+services:
+  frontend:
+    build: ./frontend
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./database:/database:ro
+    env_file:
+      - .env
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  worker:
+    build: ./backend
+    command: python -m app.workers.worker
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  database:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${DB_NAME:-spaceapps}
+      POSTGRES_USER: ${DB_USER:-spaceapps}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change_this_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-spaceapps} -d ${DB_NAME:-spaceapps}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    # The service name and MINIO_* vars are kept because the app talks S3 through
+    # minio-py. The server is VersityGW: MinIO stopped publishing public images.
+    image: versity/versitygw:v1.11.0
+    command: ["--port", ":9000", "posix", "/data"]
+    environment:
+      ROOT_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      ROOT_SECRET_KEY: ${MINIO_PASSWORD:-change_this_password}
+    ports:
+      - "9000:9000"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O- http://127.0.0.1:9000/ 2>&1 | grep -q 403",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  postgres_data:
+  minio_data:

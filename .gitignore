@@ -1,0 +1,33 @@
+# Secrets
+.env
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# Local storage / data
+storage/*
+!storage/.gitkeep
+*.h5
+*.hdf5
+*.tif
+*.tiff
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
