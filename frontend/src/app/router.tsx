@@ -1,23 +1,21 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
-import { AppLayout } from "@/components/layout/AppLayout";
-import { AnalysisPage } from "@/pages/AnalysisPage";
-import { DataSourcesPage } from "@/pages/DataSourcesPage";
-import { ExplorerPage } from "@/pages/ExplorerPage";
-import { InsightsPage } from "@/pages/InsightsPage";
+import { AnalysisPage } from "@/observatory/AnalysisPage";
+import { ExplorePage } from "@/observatory/ExplorePage";
+import { HomePage } from "@/observatory/HomePage";
+import { NewAnalysisPage } from "@/observatory/NewAnalysisPage";
+import { Shell } from "@/observatory/Shell";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <AppLayout />,
+    element: <Shell />,
     children: [
-      { index: true, element: <Navigate to="/explorer" replace /> },
-      { path: "explorer", element: <ExplorerPage /> },
-      { path: "analysis/:id", element: <AnalysisPage /> },
-      { path: "insights", element: <InsightsPage /> },
-      { path: "insights/:id", element: <InsightsPage /> },
-      { path: "data-sources", element: <DataSourcesPage /> },
-      { path: "*", element: <Navigate to="/explorer" replace /> },
+      { index: true, element: <HomePage /> },
+      { path: "analisis/:id", element: <AnalysisPage /> },
+      { path: "nuevo", element: <NewAnalysisPage /> },
+      { path: "explorar", element: <ExplorePage /> },
+      { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
 ]);

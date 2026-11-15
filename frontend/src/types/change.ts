@@ -1,4 +1,6 @@
-import type { MultiPolygon } from "geojson";
+import type { FeatureCollection, MultiPolygon } from "geojson";
+
+export type ChangeDirection = "DECREASE" | "INCREASE";
 
 export interface ChangeEvent {
   id: string;
@@ -8,6 +10,10 @@ export interface ChangeEvent {
   area_km2: number | null;
   change_score: number | null;
   valid_pixel_percentage: number | null;
+  /** DECREASE = darker surface, INCREASE = brighter */
+  direction: ChangeDirection | null;
+  /** Signed mean backscatter change in dB */
+  mean_change_db: number | null;
   created_at: string;
 }
 
@@ -37,4 +43,42 @@ export interface TileDescription {
   /** Paths relative to the API origin, with {z}/{x}/{y} placeholders */
   layers: Partial<Record<TileLayer, string>>;
   legend: Record<string, Record<string, unknown>>;
+}
+
+/** Filters shared by the change list and the GeoJSON layer. */
+export type ChangeFilters = {
+  job_id?: string;
+  bbox?: string;
+  /** One or more of POSSIBLE_FLOODING, POSSIBLE_BURN_SCAR, UNCLASSIFIED... */
+  change_type?: string[];
+  direction?: ChangeDirection;
+  min_score?: number;
+  min_area_km2?: number;
+  sort?: "area" | "score" | "newest";
+};
+
+export interface ChangeProperties {
+  id: string;
+  job_id: string;
+  change_type: string;
+  /** Spanish, ready to display */
+  label: string;
+  direction: ChangeDirection | null;
+  change_score: number | null;
+  area_km2: number | null;
+  mean_change_db: number | null;
+}
+
+/** GET /changes/geojson */
+export interface ChangeCollection extends FeatureCollection<MultiPolygon, ChangeProperties> {
+  /** How many changes match the filters */
+  numberMatched: number;
+  /** How many came back (capped by `limit`, or simplified away at low zoom) */
+  numberReturned: number;
+}
+
+export interface ChangePage {
+  items: ChangeEvent[];
+  /** Total matching the filters, from the X-Total-Count header */
+  total: number;
 }

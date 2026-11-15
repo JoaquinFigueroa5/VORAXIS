@@ -32,3 +32,12 @@ backend/data/
 .idea/
 .DS_Store
 Thumbs.db
+
+.claude
+
+.agents
+
+# taste skill: browser profiles and screenshots from the design checker
+frontend/.taste-skill/chrome-*/
+frontend/.taste-skill/gate/
+frontend/shots/
