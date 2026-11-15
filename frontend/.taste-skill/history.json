@@ -1,0 +1,20 @@
+{
+ "palettes": [
+  "white-mint-tiles"
+ ],
+ "types": [
+  "geist"
+ ],
+ "dealt": [
+  "geist",
+  "outfit",
+  "host"
+ ],
+ "moments": [
+  {
+   "id": "word-highlight",
+   "at": "2026-11-15T05:08:23.145Z",
+   "seed": "cea0afba"
+  }
+ ]
+}

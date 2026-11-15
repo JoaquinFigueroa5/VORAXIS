@@ -1,0 +1,12 @@
+[
+  {
+    "check": "focus-ring",
+    "target": ".focus-visible\\:outline-none:focus-visible",
+    "reason": "Tailwind emits this rule for the old scaffold components in src/components/ui, which no route renders; every rendered control keeps the global :focus-visible ring."
+  },
+  {
+    "check": "container-edges",
+    "target": "div#root \"Saltar",
+    "reason": "React mounts the app into div#root (Vite + React stack); header.nav, main and footer.closing sit inside it in that order."
+  }
+]
