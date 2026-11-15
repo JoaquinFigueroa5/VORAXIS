@@ -33,6 +33,7 @@ class ChangeEvent(Base):
         ),
         Index("ix_change_events_geometry", "geometry", postgresql_using="gist"),
         Index("ix_change_events_job_id", "job_id"),
+        Index("ix_change_events_job_type", "job_id", "change_type"),
         {"schema": "analysis"},
     )
 
@@ -47,6 +48,9 @@ class ChangeEvent(Base):
     area_km2: Mapped[float | None] = mapped_column(Float)
     change_score: Mapped[float | None] = mapped_column(Float)
     valid_pixel_percentage: Mapped[float | None] = mapped_column(Float)
+    # DECREASE (darker) / INCREASE (brighter) and the signed mean change in dB.
+    direction: Mapped[str | None] = mapped_column(String(10))
+    mean_change_db: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

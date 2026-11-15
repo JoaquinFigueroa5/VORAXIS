@@ -1,13 +1,16 @@
 import uuid
+from typing import Any
 
 from fastapi import APIRouter
 
 from app.dependencies import DbSession, Limit, Offset
 from app.schemas.job import JobOut
+from app.services.insights_service import InsightsService
 from app.services.job_service import JobService
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 service = JobService()
+insights = InsightsService()
 
 
 @router.get("", response_model=list[JobOut])
@@ -23,3 +26,9 @@ def get_job(job_id: uuid.UUID, db: DbSession) -> JobOut:
 @router.post("/{job_id}/cancel", response_model=JobOut)
 def cancel_job(job_id: uuid.UUID, db: DbSession) -> JobOut:
     return service.cancel(db, job_id)
+
+
+@router.get("/{job_id}/insights")
+def get_job_insights(job_id: uuid.UUID, db: DbSession) -> dict[str, Any]:
+    """Aggregates for charts: by change type and direction, histograms, evidence and rain."""
+    return insights.for_job(db, job_id)

@@ -34,3 +34,5 @@ class AnalysisAccepted(BaseModel):
     status: str
     progress: int
     message: str
+    # The pair is usable, but the user should know (e.g. different processing versions).
+    warnings: list[str] = Field(default_factory=list)

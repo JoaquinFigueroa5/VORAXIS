@@ -1,5 +1,36 @@
+from typing import Any
+
+from rq import get_current_job
+
 from app.core.database import SessionLocal
 from app.services.ingest_service import IngestService
+
+# Share of the progress bar each stage ends at; the download dominates.
+_STAGE_END = {"DOWNLOADING": 80, "CONVERTING": 92, "UPLOADING": 98, "READY": 100}
+
+
+def _reporter():
+    """Write stage/progress into the RQ job so GET /ingest/{id} can show it."""
+    job = get_current_job()
+
+    def report(stage: str, detail: dict[str, Any] | None = None) -> None:
+        if job is None:  # called outside a worker (tests, scripts)
+            return
+        detail = detail or {}
+        progress = _STAGE_END.get(stage, 0)
+        text = None
+        if stage == "DOWNLOADING":
+            done, total = detail.get("bytes", 0), detail.get("total")
+            progress = int(_STAGE_END[stage] * done / total) if total else 0
+            text = f"{done / 1e9:.2f} GB" + (f" de {total / 1e9:.2f} GB" if total else "")
+        elif stage == "CONVERTING":
+            progress = _STAGE_END["DOWNLOADING"] + 1
+        elif stage == "UPLOADING":
+            progress = _STAGE_END["CONVERTING"] + 1
+        job.meta.update(stage=stage, progress=progress, detail=text)
+        job.save_meta()
+
+    return report
 
 
 def run(
@@ -28,5 +59,6 @@ def run(
             frequency=frequency,
             multilook=multilook,
             force=force,
+            on_progress=_reporter(),
         )
     return result.as_dict()

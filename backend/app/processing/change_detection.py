@@ -31,4 +31,3 @@ def run(db, context) -> None:
     context.threshold_db = threshold
     context.baseline_db = baseline
     context.changed_fraction = float(flagged.sum() / valid.sum())
-    context.valid_pixel_percentage = float(valid.sum() / valid.size * 100.0)

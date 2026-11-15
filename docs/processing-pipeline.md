@@ -48,7 +48,10 @@ cuádruple. Es una **intensidad relativa**, no una probabilidad.
   de píxeles se recortan a la intersección. Otra cosa falla con el motivo.
 - Los COG ingeridos llevan la etiqueta `units=dB`; un raster sin ella se trata como
   potencia lineal y se convierte.
-- Polarización y madurez compatibles (validado antes de encolar).
+- Polarización y madurez compatibles (validado antes de encolar). Una versión de
+  procesamiento distinta entre fechas ya no bloquea: queda como aviso en el job.
+- El % de píxeles válidos se mide sobre el área que al menos una fecha observa; el
+  relleno fuera del frame no cuenta. La cobertura del AOI se reporta aparte.
 
 ## Salidas
 

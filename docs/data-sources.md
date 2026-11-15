@@ -27,6 +27,9 @@ para que la interfaz pueda distinguir "no hubo eventos" de "no se pudo consultar
 `fetch_auxiliary: false` en la petición
 lo desactiva.
 
+Las mismas fuentes se pueden consultar directamente para cualquier punto con las
+rutas `/context/*` (ver `docs/api.md`).
+
 - **FIRMS**: la clave se pide en <https://firms.modaps.eosdis.nasa.gov/api/map_key/> y
   va en `.env` como `FIRMS_API_KEY`. Se consultan las colecciones VIIRS NRT de
   NOAA-21, NOAA-20 y Suomi NPP (últimos ~2 meses) y, si no devuelven nada, las de

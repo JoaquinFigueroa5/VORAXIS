@@ -30,7 +30,8 @@ class EarthdataClient:
         # `login` returns an Auth object; the HTTP session comes from it.
         return auth.get_session()
 
-    def download(self, url: str, destination) -> bool:
+    def download(self, url: str, destination, progress=None) -> bool:
+        """`progress(bytes_done, total_or_None)` is called about every 50 MB."""
         if not self.configured:
             logger.info("no Earthdata credentials; skipping authenticated download")
             return False
@@ -44,9 +45,18 @@ class EarthdataClient:
         try:
             with session.get(url, stream=True, timeout=120) as response:
                 response.raise_for_status()
+                length = response.headers.get("Content-Length")
+                total = int(length) if length and length.isdigit() else None
+                done = reported = 0
                 with partial.open("wb") as handle:
                     for chunk in response.iter_content(chunk_size=1024 * 1024):
                         handle.write(chunk)
+                        done += len(chunk)
+                        if progress and done - reported >= 50 * 1024 * 1024:
+                            reported = done
+                            progress(done, total)
+                if progress:
+                    progress(done, total)
             partial.replace(destination)
         finally:
             partial.unlink(missing_ok=True)

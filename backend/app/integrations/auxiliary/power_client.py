@@ -80,6 +80,43 @@ def summarise(
 
 
 class PowerClient:
+    def fetch_series(
+        self,
+        *,
+        longitude: float,
+        latitude: float,
+        start: date,
+        end: date,
+        timeout: float = 60.0,
+    ) -> dict[str, Any] | None:
+        """Daily rain, totals, anomaly and site elevation for a point. None without data."""
+        common = {
+            "parameters": PARAMETER,
+            "community": "RE",
+            "longitude": round(longitude, 4),
+            "latitude": round(latitude, 4),
+            "format": "JSON",
+        }
+        window = {"start": start.strftime("%Y%m%d"), "end": end.strftime("%Y%m%d")}
+        with httpx.Client(timeout=timeout) as client:
+            daily = client.get(DAILY_ENDPOINT, params={**common, **window})
+            daily.raise_for_status()
+            climatology = client.get(CLIMATOLOGY_ENDPOINT, params=common)
+            climatology.raise_for_status()
+
+        payload = daily.json()
+        summary = summarise(_series(payload), _series(climatology.json()), start, end)
+        if summary is None:
+            logger.info("POWER has no precipitation yet for %s..%s", start, end)
+            return None
+        coordinates = (payload.get("geometry") or {}).get("coordinates") or []
+        elevation = coordinates[2] if len(coordinates) > 2 else None
+        return {
+            **summary,
+            "elevation_m": None if elevation is None else round(float(elevation), 0),
+            "endpoint": str(daily.request.url),
+        }
+
     def fetch_event(
         self,
         *,
@@ -91,26 +128,12 @@ class PowerClient:
     ) -> dict[str, Any] | None:
         """One PRECIPITATION event for the cell containing the point, or None without data."""
         first, last = start.date(), end.date()
-        common = {
-            "parameters": PARAMETER,
-            "community": "RE",
-            "longitude": round(longitude, 4),
-            "latitude": round(latitude, 4),
-            "format": "JSON",
-        }
-        with httpx.Client(timeout=timeout) as client:
-            daily = client.get(
-                DAILY_ENDPOINT,
-                params={**common, "start": first.strftime("%Y%m%d"), "end": last.strftime("%Y%m%d")},
-            )
-            daily.raise_for_status()
-            climatology = client.get(CLIMATOLOGY_ENDPOINT, params=common)
-            climatology.raise_for_status()
-
-        summary = summarise(_series(daily.json()), _series(climatology.json()), first, last)
-        if summary is None:
-            logger.info("POWER has no precipitation yet for %s..%s", first, last)
+        series = self.fetch_series(
+            longitude=longitude, latitude=latitude, start=first, end=last, timeout=timeout
+        )
+        if series is None:
             return None
+        summary = {k: v for k, v in series.items() if k not in ("elevation_m", "endpoint")}
         west, south, east, north = cell_bounds(longitude, latitude)
         peak = date.fromisoformat(summary["peak_date"])
         return {

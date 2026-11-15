@@ -28,6 +28,12 @@ class ProcessingError(AppError):
     status_code = 500
 
 
+class UpstreamError(AppError):
+    """An external catalogue (ASF, USGS, POWER, FIRMS) failed or is not configured."""
+
+    status_code = 502
+
+
 class NotImplementedFeature(AppError):
     """Endpoint or mode that exists in the architecture but has no implementation yet."""
 

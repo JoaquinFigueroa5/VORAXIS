@@ -40,6 +40,12 @@ def enqueue_ingest(location_id: str, **options) -> str:
         INGEST_TASK,
         location_id,
         **options,
+        meta={
+            "product_id": options.get("product_id"),
+            "location_id": location_id,
+            "stage": "QUEUED",
+            "progress": 0,
+        },
         job_timeout=4 * 3600,  # multi-GB download + conversion
         result_ttl=86400,
         failure_ttl=86400,

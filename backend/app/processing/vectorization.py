@@ -134,6 +134,8 @@ def run(db, context) -> None:
             area_km2=region.area_km2,
             change_score=round(region.score, 4),
             valid_pixel_percentage=context.valid_pixel_percentage,
+            direction=region.direction,
+            mean_change_db=round(region.mean_change_db, 4),
         )
         db.add(event)
         db.flush()

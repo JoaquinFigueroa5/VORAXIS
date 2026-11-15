@@ -24,6 +24,8 @@ from shapely.geometry.base import BaseGeometry
 from app.core.config import settings
 from app.core.exceptions import AppError, NotFoundError
 from app.core.logging import get_logger
+from app.integrations.nisar.asf_client import AsfClient
+from app.integrations.nisar.catalog_mapper import map_asf_product
 from app.integrations.nisar.earthdata_client import EarthdataClient
 from app.integrations.nisar.product_name import ProductName, parse_product_name
 from app.integrations.storage.minio_client import MinioStorage
@@ -87,6 +89,7 @@ class IngestService:
         locations: LocationRepository | None = None,
         earthdata: EarthdataClient | None = None,
         storage: MinioStorage | None = None,
+        asf: AsfClient | None = None,
     ) -> None:
         self.scenes = scenes or NisarRepository()
         self.observations = observations or ObservationRepository()
@@ -94,6 +97,7 @@ class IngestService:
         self.locations = locations or LocationRepository()
         self.earthdata = earthdata or EarthdataClient()
         self.storage = storage or MinioStorage()
+        self.asf = asf or AsfClient()
 
     def ingest(
         self,
@@ -108,13 +112,18 @@ class IngestService:
         frequency: str = "A",
         multilook: int = 1,
         force: bool = False,
+        on_progress=None,
     ) -> IngestResult:
         """Identify the scene by `scene_id`, `product_id` or the name of `h5_path`.
 
         Without `h5_path` the granule is downloaded from `scene.source_url`
-        (needs Earthdata credentials). A scene missing from the catalogue is
-        created from the HDF5 metadata. Re-running is a no-op unless `force`.
+        (needs Earthdata credentials); a `product_id` the catalogue does not
+        hold yet is looked up in ASF first. A local file missing from the
+        catalogue is registered from its HDF5 metadata. Re-running is a no-op
+        unless `force`. `on_progress(stage, detail)` reports DOWNLOADING,
+        CONVERTING, UPLOADING and READY.
         """
+        report = on_progress or (lambda stage, detail=None: None)
         location, aoi = self._location(db, location_id, location_name)
         scene = self._known_scene(db, scene_id, product_id, h5_path)
         if scene is not None and scene.product_type != SUPPORTED_PRODUCT:
@@ -122,7 +131,7 @@ class IngestService:
                 f"scene {scene.product_id} is {scene.product_type}; only GCOV ingestion exists"
             )
 
-        path = Path(h5_path) if h5_path else self._download(scene)
+        path = Path(h5_path) if h5_path else self._download(scene, report)
         info = inspect_gcov(path, frequency=frequency)
         declared = info.identification.get("productType")
         if isinstance(declared, str) and declared and declared.upper() != SUPPORTED_PRODUCT:
@@ -136,6 +145,7 @@ class IngestService:
         existing = self.rasters.source_for_observation(db, observation.id)
         if existing is not None and observation.storage_status == "READY" and not force:
             logger.info("observation %s already ingested; skipping", observation.id)
+            report("READY")
             return IngestResult(
                 observation_id=observation.id,
                 scene_id=scene.id,
@@ -150,6 +160,7 @@ class IngestService:
         key = f"sources/{observation.id}/{scene.product_id}.tif"
         try:
             with tempfile.TemporaryDirectory(prefix="ingest-") as workdir:
+                report("CONVERTING")
                 cog = gcov_to_cog(
                     path,
                     Path(workdir) / "source.tif",
@@ -158,6 +169,7 @@ class IngestService:
                     frequency=frequency,
                     multilook=multilook,
                 )
+                report("UPLOADING")
                 self.storage.ensure_bucket()
                 self.storage.upload_file(cog.path, key, content_type="image/tiff")
 
@@ -203,6 +215,7 @@ class IngestService:
             raise
 
         logger.info("ingested %s for %s -> %s", scene.product_id, location.name, key)
+        report("READY")
         return IngestResult(
             observation_id=observation.id,
             scene_id=scene.id,
@@ -236,15 +249,30 @@ class IngestService:
         if product_id:
             scene = self.scenes.get_by_product_id(db, product_id)
             if scene is None and h5_path is None:
-                raise NotFoundError(
-                    f"scene {product_id} is not in the catalogue; sync it or pass the .h5 file"
-                )
+                scene = self._from_asf(db, product_id)
             return scene
         if h5_path is None:
             raise AppError("pass a scene id, a product id or an .h5 file")
         return self.scenes.get_by_product_id(db, Path(h5_path).stem)
 
-    def _download(self, scene: NisarScene | None) -> Path:
+    def _from_asf(self, db, product_id: str) -> NisarScene:
+        """A product the local catalogue has not synced yet: ask ASF for it by name."""
+        try:
+            product = self.asf.find_product(product_id)
+        except AppError:
+            raise
+        except Exception as exc:
+            raise AppError(f"could not look up {product_id} in ASF: {str(exc)[:200]}") from exc
+        payload = map_asf_product(product) if product else None
+        if payload is None:
+            raise NotFoundError(
+                f"scene {product_id} is not in the catalogue and ASF does not list it; "
+                "check the name or pass the .h5 file"
+            )
+        logger.info("registering scene %s from ASF", product_id)
+        return self.scenes.upsert(db, **payload)
+
+    def _download(self, scene: NisarScene | None, report=None) -> Path:
         if scene is None:  # unreachable through `ingest`, kept for direct callers
             raise AppError("cannot download without a catalogued scene")
         destination = Path(settings.nisar_data_dir) / f"{scene.product_id}.h5"
@@ -254,7 +282,14 @@ class IngestService:
         if not scene.source_url:
             raise AppError(f"scene {scene.product_id} has no source_url to download from")
         logger.info("downloading %s", scene.source_url)
-        if not self.earthdata.download(scene.source_url, destination):
+        progress = None
+        if report is not None:
+            report("DOWNLOADING", {"bytes": 0, "total": None})
+
+            def progress(done: int, total: int | None) -> None:
+                report("DOWNLOADING", {"bytes": done, "total": total})
+
+        if not self.earthdata.download(scene.source_url, destination, progress=progress):
             raise AppError(
                 "Earthdata download is unavailable: set EARTHDATA_USERNAME/EARTHDATA_PASSWORD "
                 f"in .env, or place the file at {destination} and pass it explicitly"

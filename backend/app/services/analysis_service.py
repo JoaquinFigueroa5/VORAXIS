@@ -45,12 +45,6 @@ def compatibility_problems(
         )
     if (before_scene.maturity or "") != (after_scene.maturity or ""):
         problems.append("product maturity differs")
-    if (
-        before.processing_version
-        and after.processing_version
-        and before.processing_version != after.processing_version
-    ):
-        problems.append("processing versions differ")
 
     pols_before = set(before_scene.polarization or [])
     pols_after = set(after_scene.polarization or [])
@@ -67,6 +61,22 @@ def compatibility_problems(
             problems.append(f"scene {scene.product_id} does not overlap the requested AOI")
 
     return problems
+
+
+def compatibility_warnings(before: Observation, after: Observation) -> list[str]:
+    """Things worth telling the user that do not make the pair unusable."""
+    warnings: list[str] = []
+    if (
+        before.processing_version
+        and after.processing_version
+        and before.processing_version != after.processing_version
+    ):
+        warnings.append(
+            f"The two dates were processed with different software versions "
+            f"({before.processing_version} vs {after.processing_version}); a small "
+            "scene-wide offset between them is possible and is removed as the baseline."
+        )
+    return warnings
 
 
 class AnalysisService:
@@ -96,6 +106,10 @@ class AnalysisService:
             after_observation_id=after.id,
             parameters=request.parameters.model_dump(),
         )
+        warnings = compatibility_warnings(before, after)
+        if warnings:
+            job.result = {"warnings": warnings}
+            db.commit()
 
         try:
             enqueue_analysis(str(job.id), parameters=request.parameters.model_dump())
@@ -111,4 +125,5 @@ class AnalysisService:
             status=job.status,
             progress=job.progress,
             message="Analysis queued successfully",
+            warnings=warnings,
         )

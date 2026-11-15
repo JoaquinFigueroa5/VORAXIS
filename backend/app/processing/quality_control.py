@@ -15,6 +15,21 @@ def valid_mask(before: LoadedRaster, after: LoadedRaster) -> np.ndarray:
 
 
 def valid_pixel_percentage(before: LoadedRaster, after: LoadedRaster) -> float:
+    """Share of the observed area usable on BOTH dates.
+
+    The denominator is where at least one date has data, not the whole raster:
+    an AOI larger than the radar frame is padded with nodata, and that padding
+    says nothing about the quality of the pair.
+    """
+    covered = ~(before.invalid & after.invalid)
+    observed = int(covered.sum())
+    if observed == 0:
+        return 0.0
+    return float(valid_mask(before, after).sum() / observed * 100.0)
+
+
+def aoi_coverage_percentage(before: LoadedRaster, after: LoadedRaster) -> float:
+    """Share of the whole AOI raster that both dates cover."""
     valid = valid_mask(before, after)
     if valid.size == 0:
         return 0.0
@@ -25,6 +40,7 @@ def run(db, context: JobContext) -> None:
     before, after = require_pair_loaded(context)
     percentage = valid_pixel_percentage(before, after)
     context.valid_pixel_percentage = percentage
+    context.aoi_coverage_percentage = aoi_coverage_percentage(before, after)
     if percentage < context.minimum_valid_pixel_percentage:
         raise ProcessingError(
             f"valid pixel percentage {percentage:.1f}% is below the requested "

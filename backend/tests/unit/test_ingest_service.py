@@ -107,8 +107,16 @@ class FakeStorage:
 
 
 class NoEarthdata:
-    def download(self, _url, _destination):
+    def download(self, _url, _destination, progress=None):
         return False
+
+
+class FakeAsf:
+    def __init__(self, product=None):
+        self.product = product
+
+    def find_product(self, product_id):
+        return self.product
 
 
 @pytest.fixture()
@@ -125,6 +133,7 @@ def service():
         locations=FakeLocations(),
         earthdata=NoEarthdata(),
         storage=FakeStorage(),
+        asf=FakeAsf(),
     )
 
 
@@ -206,7 +215,7 @@ def test_download_without_credentials_explains_what_to_do(service, tmp_path, mon
 def test_unknown_inputs_are_rejected(service, granule):
     with pytest.raises(NotFoundError):
         service.ingest(FakeDb(), location_name="Nowhere", h5_path=granule)
-    with pytest.raises(NotFoundError, match="not in the catalogue"):
+    with pytest.raises(NotFoundError, match="ASF does not list it"):
         service.ingest(FakeDb(), location_name="Petén", product_id="NISAR_MISSING")
     with pytest.raises(AppError, match="scene id, a product id or an .h5"):
         service.ingest(FakeDb(), location_name="Petén")
@@ -218,3 +227,42 @@ def test_nisar_nanosecond_timestamps_parse():
     )
     assert _parse_time("2026-11-11T23:40:59Z") == datetime(2026, 11, 11, 23, 40, 59, tzinfo=UTC)
     assert _parse_time("") is None
+
+
+def test_progress_is_reported_through_every_stage(service, granule):
+    stages = []
+    service.ingest(
+        FakeDb(),
+        location_name="Petén",
+        h5_path=granule,
+        on_progress=lambda stage, detail=None: stages.append(stage),
+    )
+    assert stages == ["CONVERTING", "UPLOADING", "READY"]  # a local file is not downloaded
+
+
+def test_product_missing_from_the_catalogue_is_fetched_from_asf(service, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.services.ingest_service.settings.nisar_data_dir", str(tmp_path))
+    name = "NISAR_L2_PR_GCOV_034_149_D_080_4005_DHDH_A_20261103T130953_20261103T131027_P05036_N_F_J_001"
+    service.asf = FakeAsf(
+        {
+            "sceneName": name,
+            "processingLevel": "GCOV",
+            "startTime": "2026-11-03T13:09:53Z",
+            "stopTime": "2026-11-03T13:10:27Z",
+            "flightDirection": "DESCENDING",
+            "mainBandPolarization": ["HH", "HV"],
+            "url": f"https://example.invalid/{name}.h5",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[[79.3, 15.5], [82.2, 15.5], [82.2, 18.2], [79.3, 18.2], [79.3, 15.5]]],
+            },
+        }
+    )
+
+    # The scene gets registered, then the download stops for lack of credentials.
+    with pytest.raises(AppError, match="EARTHDATA_USERNAME"):
+        service.ingest(FakeDb(), location_name="Petén", product_id=name)
+
+    scene = service.scenes.by_product[name]
+    assert scene.product_type == "GCOV" and scene.source_url.endswith(".h5")
+    assert scene.polarization == ["HH", "HV"]

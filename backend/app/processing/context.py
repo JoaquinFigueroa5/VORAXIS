@@ -43,7 +43,8 @@ class JobContext:
     threshold_db: float | None = None
     baseline_db: float | None = None
     change_score: float | None = None  # strongest per-polygon score of the job
-    valid_pixel_percentage: float | None = None
+    valid_pixel_percentage: float | None = None  # of the area the frames cover
+    aoi_coverage_percentage: float | None = None  # of the whole AOI raster
     change_event_ids: list[UUID] = field(default_factory=list)
     change_features: dict[UUID, Any] = field(default_factory=dict)  # id -> vectorization.Region
     evidence_sources: dict[str, Any] = field(default_factory=dict)
