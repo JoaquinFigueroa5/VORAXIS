@@ -1,5 +1,5 @@
 import uuid
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -33,6 +33,5 @@ class AnalysisAccepted(BaseModel):
     job_id: uuid.UUID
     status: str
     progress: int
-    message: str
     # The pair is usable, but the user should know (e.g. different processing versions).
-    warnings: list[str] = Field(default_factory=list)
+    warnings: list[dict[str, Any]] = Field(default_factory=list)

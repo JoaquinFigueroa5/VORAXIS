@@ -44,9 +44,13 @@ class LocationService:
         geometry = self._geometry(payload)
         name = payload.name.strip()
         if not name:
-            raise AppError("name must not be blank")
+            raise AppError("name must not be blank", code="location_name_blank")
         if self.repo.get_model_by_name(db, name) is not None:
-            raise ConflictError(f"a location named '{name}' already exists")
+            raise ConflictError(
+                f"a location named '{name}' already exists",
+                code="location_name_taken",
+                params={"name": name},
+            )
         location = self.repo.create(
             db,
             name=name,
@@ -59,11 +63,14 @@ class LocationService:
     @staticmethod
     def _geometry(payload: LocationCreate):
         if (payload.geometry is None) == (payload.bbox is None):
-            raise AppError("send exactly one of 'geometry' or 'bbox'")
+            raise AppError("send exactly one of 'geometry' or 'bbox'", code="location_geometry_or_bbox")
         if payload.bbox is not None:
             west, south, east, north = payload.bbox
             if west >= east or south >= north:
-                raise AppError("bbox must be [west, south, east, north] with west < east and south < north")
+                raise AppError(
+                    "bbox must be [west, south, east, north] with west < east and south < north",
+                    code="location_bbox_order",
+                )
             geometry = box(west, south, east, north)
         else:
             raw = payload.geometry
@@ -72,23 +79,37 @@ class LocationService:
             try:
                 geometry = shape(raw)
             except Exception as exc:
-                raise AppError(f"geometry is not valid GeoJSON: {exc}") from exc
+                raise AppError(
+                    f"geometry is not valid GeoJSON: {exc}", code="location_geojson_invalid"
+                ) from exc
             if geometry.geom_type not in ("Polygon", "MultiPolygon"):
-                raise AppError("geometry must be a Polygon or MultiPolygon")
+                raise AppError("geometry must be a Polygon or MultiPolygon", code="location_shape")
             if not geometry.is_valid:
                 geometry = geometry.buffer(0)
             if geometry.is_empty or geometry.geom_type not in ("Polygon", "MultiPolygon"):
-                raise AppError("geometry is empty or self-intersecting beyond repair")
+                raise AppError(
+                    "geometry is empty or self-intersecting beyond repair",
+                    code="location_geometry_broken",
+                )
 
         west, south, east, north = geometry.bounds
         if west < -180 or east > 180 or south < -90 or north > 90:
-            raise AppError("coordinates must be longitude/latitude in degrees (EPSG:4326)")
+            raise AppError(
+                "coordinates must be longitude/latitude in degrees (EPSG:4326)",
+                code="location_out_of_range",
+            )
         width, height = east - west, north - south
         if max(width, height) > MAX_SIDE_DEGREES:
             raise AppError(
                 f"the area spans {width:.2f} x {height:.2f} degrees; the maximum is "
-                f"{MAX_SIDE_DEGREES:g} per side. Draw a smaller area."
+                f"{MAX_SIDE_DEGREES:g} per side. Draw a smaller area.",
+                code="location_too_large",
+                params={"width": f"{width:.2f}", "height": f"{height:.2f}", "max": f"{MAX_SIDE_DEGREES:g}"},
             )
         if min(width, height) < MIN_SIDE_DEGREES:
-            raise AppError(f"the area is too small; each side must be at least {MIN_SIDE_DEGREES:g} degrees")
+            raise AppError(
+                f"the area is too small; each side must be at least {MIN_SIDE_DEGREES:g} degrees",
+                code="location_too_small",
+                params={"min": f"{MIN_SIDE_DEGREES:g}"},
+            )
         return geometry

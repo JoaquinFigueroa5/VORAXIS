@@ -4,6 +4,8 @@ The endpoint validates the pair, creates a `processing_jobs` row and enqueues th
 work in Redis. It never waits for raster processing.
 """
 
+from typing import Any
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -25,31 +27,40 @@ logger = get_logger(__name__)
 
 def compatibility_problems(
     db: Session, before: Observation, after: Observation, location: Location
-) -> list[str]:
-    """Rules 1 and 2 from docs/architecture.md, in executable form."""
-    problems: list[str] = []
+) -> list[dict[str, Any]]:
+    """Rules 1 and 2 from docs/architecture.md, in executable form.
+
+    Each problem is `{code, params}`; the client writes the sentence.
+    """
+    problems: list[dict[str, Any]] = []
 
     if before.id == after.id:
-        problems.append("before and after observations must be different")
+        problems.append({"code": "same_observation"})
     if before.acquisition_date >= after.acquisition_date:
-        problems.append("before observation must predate the after observation")
+        problems.append({"code": "dates_not_increasing"})
 
     before_scene = db.get(NisarScene, before.scene_id)
     after_scene = db.get(NisarScene, after.scene_id)
     if before_scene is None or after_scene is None:
-        raise NotFoundError("observation is missing its NISAR scene")
+        raise NotFoundError("observation is missing its NISAR scene", code="observation_without_scene")
 
     if before_scene.product_type != after_scene.product_type:
         problems.append(
-            f"product types differ ({before_scene.product_type} vs {after_scene.product_type})"
+            {
+                "code": "product_type_differs",
+                "params": {
+                    "before": before_scene.product_type,
+                    "after": after_scene.product_type,
+                },
+            }
         )
     if (before_scene.maturity or "") != (after_scene.maturity or ""):
-        problems.append("product maturity differs")
+        problems.append({"code": "maturity_differs"})
 
     pols_before = set(before_scene.polarization or [])
     pols_after = set(after_scene.polarization or [])
     if pols_before and pols_after and not pols_before & pols_after:
-        problems.append("observations share no common polarisation")
+        problems.append({"code": "no_common_polarisation"})
 
     for scene in (before_scene, after_scene):
         overlaps = db.execute(
@@ -58,23 +69,29 @@ def compatibility_problems(
             )
         ).scalar_one_or_none()
         if not overlaps:
-            problems.append(f"scene {scene.product_id} does not overlap the requested AOI")
+            problems.append(
+                {"code": "scene_without_overlap", "params": {"product_id": scene.product_id}}
+            )
 
     return problems
 
 
-def compatibility_warnings(before: Observation, after: Observation) -> list[str]:
+def compatibility_warnings(before: Observation, after: Observation) -> list[dict[str, Any]]:
     """Things worth telling the user that do not make the pair unusable."""
-    warnings: list[str] = []
+    warnings: list[dict[str, Any]] = []
     if (
         before.processing_version
         and after.processing_version
         and before.processing_version != after.processing_version
     ):
         warnings.append(
-            f"The two dates were processed with different software versions "
-            f"({before.processing_version} vs {after.processing_version}); a small "
-            "scene-wide offset between them is possible and is removed as the baseline."
+            {
+                "code": "processing_version_differs",
+                "params": {
+                    "before": before.processing_version,
+                    "after": after.processing_version,
+                },
+            }
         )
     return warnings
 
@@ -97,7 +114,10 @@ class AnalysisService:
 
         problems = compatibility_problems(db, before, after, location)
         if problems:
-            raise IncompatibleObservationsError("; ".join(problems))
+            raise IncompatibleObservationsError(
+                "; ".join(problem["code"] for problem in problems),
+                params={"problems": problems},
+            )
 
         job = self.jobs.create(
             db,
@@ -116,14 +136,13 @@ class AnalysisService:
         except Exception as exc:  # Redis down: fail the job now, not silently later
             logger.exception("could not enqueue job %s", job.id)
             self.jobs.set_status(
-                db, job, status="FAILED", error_message=f"queue unavailable: {exc}"
+                db, job, status="FAILED", error_message="queue_unavailable"
             )
-            raise AppError("analysis queue is unavailable") from exc
+            raise AppError("analysis queue is unavailable", code="queue_unavailable") from exc
 
         return AnalysisAccepted(
             job_id=job.id,
             status=job.status,
             progress=job.progress,
-            message="Analysis queued successfully",
             warnings=warnings,
         )

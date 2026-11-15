@@ -24,6 +24,5 @@ class EvidenceRecordOut(ORMModel):
     distance_km: float | None = None
     time_difference_hours: float | None = None
     evidence_score: float | None = None
-    explanation: str | None = None
     created_at: datetime
     event: AuxiliaryEventOut | None = None

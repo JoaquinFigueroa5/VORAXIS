@@ -33,7 +33,11 @@ class JobService:
         if job is None:
             raise NotFoundError(f"job {job_id} not found")
         if job.status not in ("PENDING", "RUNNING"):
-            raise ConflictError(f"job is {job.status} and cannot be cancelled")
+            raise ConflictError(
+                f"job is {job.status} and cannot be cancelled",
+                code="job_not_cancellable",
+                params={"status": job.status},
+            )
         # The worker re-reads the row between pipeline steps and stops there.
-        self.repo.set_status(db, job, status="CANCELLED", error_message="cancelled by user")
+        self.repo.set_status(db, job, status="CANCELLED", error_message="cancelled_by_user")
         return JobOut.model_validate(job)

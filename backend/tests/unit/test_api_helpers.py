@@ -86,7 +86,8 @@ def test_different_processing_versions_warn_instead_of_blocking():
     after = SimpleNamespace(processing_version="P05036")
 
     (warning,) = compatibility_warnings(before, after)
-    assert "P05023" in warning and "P05036" in warning
+    assert warning["code"] == "processing_version_differs"
+    assert warning["params"] == {"before": "P05023", "after": "P05036"}
     assert compatibility_warnings(before, before) == []
     assert compatibility_warnings(SimpleNamespace(processing_version=None), after) == []
 
@@ -121,12 +122,20 @@ class FakeJob:
 def test_running_task_reports_stage_and_progress():
     job = FakeJob(
         SimpleNamespace(value="started"),  # RQ hands back an enum
-        meta={"product_id": "P", "location_id": "L", "stage": "DOWNLOADING", "progress": 37, "detail": "1.80 GB de 4.89 GB"},
+        meta={
+            "product_id": "P",
+            "location_id": "L",
+            "stage": "DOWNLOADING",
+            "progress": 37,
+            "bytes_done": 1_800_000_000,
+            "bytes_total": 4_890_000_000,
+        },
     )
     task = ingest_task_service.to_out(job)
 
     assert (task.status, task.stage, task.progress) == ("RUNNING", "DOWNLOADING", 37)
-    assert task.detail == "1.80 GB de 4.89 GB" and task.result is None
+    assert task.bytes_done == 1_800_000_000 and task.bytes_total == 4_890_000_000
+    assert task.result is None
 
 
 def test_finished_task_is_ready_with_its_observation():

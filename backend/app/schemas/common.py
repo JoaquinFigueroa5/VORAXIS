@@ -21,6 +21,8 @@ class HealthOut(BaseModel):
 
 class ErrorOut(BaseModel):
     error: str
+    code: str
+    params: dict[str, Any] | None = None
     detail: str
 
 

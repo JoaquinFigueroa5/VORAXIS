@@ -1,6 +1,6 @@
 """Tentative change type from the radar signature plus the linked evidence.
 
-Every label starts with POSSIBLE_: a backscatter change with a matching event
+Every type starts with POSSIBLE_: a backscatter change with a matching event
 nearby is a hypothesis, not a validated interpretation. Without a rule that
 fits, the change stays UNCLASSIFIED rather than being forced into a category.
 
@@ -8,22 +8,16 @@ Typical L-band backscatter (dB) used by the rules:
 
     open calm water      below -17 (co-pol)  / -24 (cross-pol)
     dense vegetation     above -10 (co-pol)  / -16 (cross-pol)
+
+Reasons are `{code, params}`: the client writes the sentence in its language and
+no prose is stored. Numbers arrive as strings with a dot decimal separator, which
+reads the same in Spanish and English.
 """
 
 from dataclasses import dataclass, field
 from typing import Any
 
 UNCLASSIFIED = "UNCLASSIFIED"
-
-LABELS_ES = {
-    "POSSIBLE_BURN_SCAR": "Posible área quemada",
-    "POSSIBLE_FLOODING": "Posible inundación",
-    "POSSIBLE_FLOODED_VEGETATION": "Posible vegetación inundada",
-    "POSSIBLE_WATER_RECESSION": "Posible retroceso de agua",
-    "POSSIBLE_VEGETATION_LOSS": "Posible pérdida de vegetación",
-    "POSSIBLE_SEISMIC_DISTURBANCE": "Posible alteración por sismo",
-    UNCLASSIFIED: "Cambio sin clasificar",
-}
 
 _WATER_DB = {"co": -17.0, "cross": -24.0}
 _VEGETATION_DB = {"co": -10.0, "cross": -16.0}
@@ -36,15 +30,31 @@ _HEAVY_RAIN_ANOMALY_PCT = 50.0
 _EXTREME_RAIN_MM = 200.0
 
 
+def reason(code: str, **params: str) -> dict[str, Any]:
+    return {"code": code, "params": params}
+
+
+def _mm(value: float) -> str:
+    return f"{value:.0f}"
+
+
+def _db(value: float) -> str:
+    return f"{value:.1f}"
+
+
+def _signed_db(value: float) -> str:
+    return f"{value:+.1f}"
+
+
+def _pct(value: float) -> str:
+    return f"{value:+.0f}"
+
+
 @dataclass
 class Classification:
     change_type: str = UNCLASSIFIED
     confidence: str = "NONE"  # NONE | LOW | MEDIUM
-    reasons: list[str] = field(default_factory=list)
-
-    @property
-    def label(self) -> str:
-        return LABELS_ES.get(self.change_type, self.change_type)
+    reasons: list[dict[str, Any]] = field(default_factory=list)
 
 
 def _best(evidence: list[dict[str, Any]], event_type: str) -> dict[str, Any] | None:
@@ -79,37 +89,32 @@ def classify(
         rain_mm >= _EXTREME_RAIN_MM
         or (rain_mm >= _HEAVY_RAIN_MM and (rain_anomaly or 0.0) >= _HEAVY_RAIN_ANOMALY_PCT)
     )
-    rain_text = f"llovieron {rain_mm:.0f} mm en la ventana" + (
-        f" ({rain_anomaly:+.0f} % respecto a lo normal)" if rain_anomaly is not None else ""
+    rain_reason = (
+        reason("rain.window_anomaly", mm=_mm(rain_mm), anomaly=_pct(float(rain_anomaly)))
+        if rain_anomaly is not None
+        else reason("rain.window", mm=_mm(rain_mm))
     )
 
     if fire is not None and (fire.get("score") or 0.0) >= _MIN_FIRE_SCORE:
         reasons = [
-            f"{fire_count} detección(es) de fuego activo de FIRMS dentro o junto al área, "
-            "entre las dos adquisiciones o pocos días antes."
+            reason(
+                "fire.nearby",
+                count=str(fire_count),
+            )
         ]
         if decrease:
-            reasons.append(
-                f"La retrodispersión bajó {change:.1f} dB, lo esperado cuando se pierde vegetación al quemarse."
-            )
+            reasons.append(reason("fire.decrease", delta=_db(change)))
             confidence = "MEDIUM" if (fire.get("score") or 0.0) >= 0.6 else "LOW"
         else:
-            reasons.append(
-                f"La retrodispersión subió {change:.1f} dB, lo que no es la firma habitual de un "
-                "área quemada; la coincidencia con el fuego se mantiene como hipótesis débil."
-            )
+            reasons.append(reason("fire.increase", delta=_db(change)))
             confidence = "LOW"
         return Classification("POSSIBLE_BURN_SCAR", confidence, reasons)
 
     if decrease and after_db <= water and before_db > water + 2.0:
         reasons = [
-            f"La retrodispersión cayó de {before_db:.1f} a {after_db:.1f} dB, un nivel propio de "
-            "agua abierta en calma: la superficie pasó de terreno a espejo de agua."
+            reason("flood.open_water", before=_db(before_db), after=_db(after_db)),
         ]
-        if heavy_rain:
-            reasons.append(f"En la celda de la zona {rain_text}.")
-        else:
-            reasons.append("No hay lluvia notable registrada que lo respalde.")
+        reasons.append(rain_reason if heavy_rain else reason("rain.none"))
         return Classification("POSSIBLE_FLOODING", "MEDIUM" if heavy_rain else "LOW", reasons)
 
     if decrease and heavy_rain and change >= 3.0 and before_db > water + 2.0:
@@ -117,10 +122,13 @@ def classify(
             "POSSIBLE_FLOODING",
             "LOW",
             [
-                f"La retrodispersión cayó {change:.1f} dB (de {before_db:.1f} a {after_db:.1f} dB) sin "
-                "llegar al nivel de agua abierta: es compatible con inundación parcial o cultivos "
-                "anegados dentro del píxel.",
-                f"En la celda de la zona {rain_text}.",
+                reason(
+                    "flood.partial",
+                    delta=_db(change),
+                    before=_db(before_db),
+                    after=_db(after_db),
+                ),
+                rain_reason,
             ],
         )
 
@@ -128,21 +136,14 @@ def classify(
         return Classification(
             "POSSIBLE_FLOODED_VEGETATION",
             "LOW",
-            [
-                f"La retrodispersión subió {change:.1f} dB: agua bajo vegetación refuerza el rebote "
-                "doble de la señal en banda L.",
-                f"En la celda de la zona {rain_text}.",
-            ],
+            [reason("flooded_vegetation.increase", delta=_db(change)), rain_reason],
         )
 
     if not decrease and before_db <= water and after_db > water + 2.0:
         return Classification(
             "POSSIBLE_WATER_RECESSION",
             "LOW",
-            [
-                f"La retrodispersión subió de {before_db:.1f} a {after_db:.1f} dB: una superficie con "
-                "firma de agua en la primera fecha ya no la tiene en la segunda."
-            ],
+            [reason("water.recession", before=_db(before_db), after=_db(after_db))],
         )
 
     if decrease and before_db >= vegetation and change >= 2.0 and after_db > water:
@@ -150,9 +151,8 @@ def classify(
             "POSSIBLE_VEGETATION_LOSS",
             "LOW",
             [
-                f"La retrodispersión bajó {change:.1f} dB desde {before_db:.1f} dB, un nivel propio de "
-                "vegetación densa, sin llegar a firma de agua.",
-                "No hay detecciones de fuego cercanas: es compatible con tala o cosecha, no con quema.",
+                reason("vegetation.loss", delta=_db(change), before=_db(before_db)),
+                reason("vegetation.no_fire"),
             ],
         )
 
@@ -165,14 +165,20 @@ def classify(
             "POSSIBLE_SEISMIC_DISTURBANCE",
             "LOW",
             [
-                f"Sismo de magnitud {quake['magnitude']:.1f} registrado por USGS cerca del área "
-                "entre las dos adquisiciones.",
-                "La retrodispersión no mide desplazamiento del terreno; confirmar con interferometría (GUNW).",
+                reason("quake.nearby", magnitude=_db(float(quake["magnitude"]))),
+                reason("quake.not_displacement"),
             ],
         )
 
-    reasons = [
-        f"Cambio de {mean_change_db:+.1f} dB ({before_db:.1f} → {after_db:.1f} dB) sin una firma "
-        "ni un evento asociado que permita proponer una causa."
-    ]
-    return Classification(UNCLASSIFIED, "NONE", reasons)
+    return Classification(
+        UNCLASSIFIED,
+        "NONE",
+        [
+            reason(
+                "unclassified",
+                delta=_signed_db(mean_change_db),
+                before=_db(before_db),
+                after=_db(after_db),
+            )
+        ],
+    )

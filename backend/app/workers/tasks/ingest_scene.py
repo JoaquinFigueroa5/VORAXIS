@@ -18,16 +18,17 @@ def _reporter():
             return
         detail = detail or {}
         progress = _STAGE_END.get(stage, 0)
-        text = None
+        done = total = None
         if stage == "DOWNLOADING":
             done, total = detail.get("bytes", 0), detail.get("total")
             progress = int(_STAGE_END[stage] * done / total) if total else 0
-            text = f"{done / 1e9:.2f} GB" + (f" de {total / 1e9:.2f} GB" if total else "")
         elif stage == "CONVERTING":
             progress = _STAGE_END["DOWNLOADING"] + 1
         elif stage == "UPLOADING":
             progress = _STAGE_END["CONVERTING"] + 1
-        job.meta.update(stage=stage, progress=progress, detail=text)
+        job.meta.update(
+            stage=stage, progress=progress, bytes_done=done, bytes_total=total
+        )
         job.save_meta()
 
     return report

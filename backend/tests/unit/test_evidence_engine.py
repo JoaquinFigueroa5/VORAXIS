@@ -239,7 +239,7 @@ QUAKE = {"event_type": "EARTHQUAKE", "score": 0.5, "magnitude": 6.1, "metadata":
 def test_fire_nearby_and_a_drop_is_a_possible_burn_scar():
     result = _classify(evidence=[FIRE])
     assert result.change_type == "POSSIBLE_BURN_SCAR" and result.confidence == "MEDIUM"
-    assert "FIRMS" in result.reasons[0]
+    assert result.reasons[0] == {"code": "fire.nearby", "params": {"count": "1"}}
 
 
 def test_fire_with_a_rise_stays_a_weak_hypothesis():
@@ -253,7 +253,10 @@ def test_drop_to_water_level_is_possible_flooding_and_rain_raises_confidence():
 
     assert dry.change_type == wet.change_type == "POSSIBLE_FLOODING"
     assert (dry.confidence, wet.confidence) == ("LOW", "MEDIUM")
-    assert "160 mm" in wet.reasons[1]
+    assert wet.reasons[1] == {
+        "code": "rain.window_anomaly",
+        "params": {"mm": "160", "anomaly": "+120"},
+    }
 
 
 def test_water_thresholds_follow_the_polarization():
@@ -274,7 +277,7 @@ def test_strong_drop_under_anomalous_rain_is_partial_flooding_not_vegetation_los
     assert _classify(**kwargs).change_type == "POSSIBLE_VEGETATION_LOSS"
     wet = _classify(**kwargs, evidence=[RAIN])
     assert wet.change_type == "POSSIBLE_FLOODING" and wet.confidence == "LOW"
-    assert "parcial" in wet.reasons[0]
+    assert wet.reasons[0]["code"] == "flood.partial"
 
 
 def test_rise_after_heavy_rain_is_possible_flooded_vegetation():
@@ -295,18 +298,29 @@ def test_drop_over_dense_vegetation_without_fire_is_possible_vegetation_loss():
 def test_strong_earthquake_alone_is_a_low_confidence_hypothesis():
     result = _classify(mean_change_db=-1.5, before_db=-12.0, after_db=-13.5, evidence=[QUAKE])
     assert result.change_type == "POSSIBLE_SEISMIC_DISTURBANCE" and result.confidence == "LOW"
-    assert "GUNW" in result.reasons[1]
+    assert result.reasons[1]["code"] == "quake.not_displacement"
 
 
 def test_nothing_fits_stays_unclassified():
     result = _classify(mean_change_db=-1.5, before_db=-12.0, after_db=-13.5)
     assert result.change_type == "UNCLASSIFIED" and result.confidence == "NONE"
-    assert result.label == "Cambio sin clasificar"
+    assert result.reasons == [
+        {
+            "code": "unclassified",
+            "params": {"delta": "-1.5", "before": "-12.0", "after": "-13.5"},
+        }
+    ]
 
 
-def test_every_label_fits_the_column_and_has_a_spanish_name():
-    for change_type, label in classification.LABELS_ES.items():
-        assert len(change_type) <= 50 and label
+def test_reasons_are_codes_and_params_never_prose():
+    samples = [
+        _classify(evidence=[FIRE]),
+        _classify(mean_change_db=-1.5, before_db=-12.0, after_db=-13.5),
+    ]
+    for result in samples:
+        assert len(result.change_type) <= 50
+        for item in result.reasons:
+            assert set(item) == {"code", "params"} and item["code"]
 
 
 # --- collection --------------------------------------------------------------

@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from app.core.exceptions import NotFoundError
-from app.evidence.classification import LABELS_ES
+from app.core.exceptions import NotFoundError
 from app.repositories.change_repository import ChangeRepository
 from app.repositories.raster_repository import RasterRepository
 from app.schemas.change import ChangeEventOut, ChangeMetricOut
@@ -69,7 +69,6 @@ class ChangeService:
                         "id": str(change.id),
                         "job_id": str(change.job_id),
                         "change_type": change.change_type,
-                        "label": LABELS_ES.get(change.change_type, change.change_type),
                         "direction": change.direction,
                         "change_score": change.change_score,
                         "area_km2": change.area_km2,
