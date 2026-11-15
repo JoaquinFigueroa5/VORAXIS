@@ -215,14 +215,28 @@ def run(base: str, lat: float, lon: float, start: date, end: date, timeout: floa
             metrics = c.json("change metrics", f"/changes/{change['id']}/metrics")
             if metrics is not None:
                 names = {metric["metric_name"] for metric in metrics}
-                c.check("metrics describe the polygon", {"mean_change_db", "mean_backscatter_before_db", "mean_backscatter_after_db"} <= names)
+                # dB metrics for real GCOV runs; amplitude pairs on older synthetic jobs.
+                db_metrics = {"mean_change_db", "mean_backscatter_before_db", "mean_backscatter_after_db"}
+                amplitudes = {"mean_absolute_difference", "std_absolute_difference"}
+                c.check("metrics describe the polygon", db_metrics <= names or amplitudes <= names)
             evidence = c.json("change evidence", f"/changes/{change['id']}/evidence")
             if evidence is not None:
                 c.check("evidence is a list", isinstance(evidence, list))
+            explanation = c.json("change interpretation", f"/changes/{change['id']}/interpretation")
+            if explanation:
+                c.has_keys(
+                    "interpretation",
+                    explanation,
+                    ("status", "period", "change", "classification", "metrics", "evidence", "sources", "limitations"),
+                )
+                c.check(
+                    "interpretation names the sources it could not check",
+                    isinstance(explanation["sources"], dict) and "NISAR" in explanation["sources"],
+                )
             tile = c.get(f"/changes/{change['id']}/tiles/0/0/0", layer="difference")
             c.check("tile is a PNG", tile.status_code == 200 and tile.content[:8] == b"\x89PNG\r\n\x1a\n")
         elif changes is not None:
-            c.skip("change, metrics, evidence, tile", "the job produced no changes")
+            c.skip("change, metrics, evidence, interpretation, tile", "the job produced no changes")
 
     print(f"\n{c.passed} passed, {c.failed} failed, {c.skipped} skipped")
     return 1 if c.failed else 0

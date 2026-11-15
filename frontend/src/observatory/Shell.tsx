@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { DownloadsMenu } from "@/observatory/DownloadsMenu";
-import { API_ORIGIN } from "@/observatory/lib";
+import { useInterface } from "@/stores/interface";
 
 /** Two radar passes and the line you drag between them. */
 function Mark() {
@@ -12,6 +12,26 @@ function Mark() {
       <rect x="14" y="6" width="7" height="14" rx="1.5" fill="#f3f3f3" />
       <rect x="12" y="3.5" width="2" height="19" rx="1" fill="#a1ffcb" />
     </svg>
+  );
+}
+
+/** Same screens at two levels of detail: the numbers are a toggle, not a separate app. */
+function ModeSwitch() {
+  const scientific = useInterface((state) => state.scientific);
+  const toggle = useInterface((state) => state.toggleScientific);
+  return (
+    <button
+      className="btn tonal small mode"
+      aria-pressed={scientific}
+      onClick={toggle}
+      title={
+        scientific
+          ? "Ocultar decibelios, umbrales y metadatos de proceso"
+          : "Mostrar decibelios, umbrales y metadatos de proceso"
+      }
+    >
+      {scientific ? "Modo científico" : "Modo exploración"}
+    </button>
   );
 }
 
@@ -40,10 +60,14 @@ export function Shell() {
             <NavLink to="/explorar" className={link}>
               Explorar
             </NavLink>
-            <NavLink to="/nuevo" className={link}>
-              Nuevo análisis
+            <NavLink to="/insights" className={link}>
+              Insights
+            </NavLink>
+            <NavLink to="/metodologia" className={link}>
+              Metodología
             </NavLink>
           </nav>
+          <ModeSwitch />
           <DownloadsMenu />
         </div>
       </header>
@@ -74,9 +98,7 @@ export function Shell() {
                     <Link to="/nuevo">Nuevo análisis</Link>
                   </li>
                   <li>
-                    <a href={`${API_ORIGIN}/docs`} target="_blank" rel="noreferrer">
-                      Documentación de la API
-                    </a>
+                    <Link to="/metodologia">Metodología y fuentes</Link>
                   </li>
                 </ul>
               </div>

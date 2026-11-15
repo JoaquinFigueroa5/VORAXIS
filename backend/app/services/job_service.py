@@ -7,10 +7,19 @@ class JobService:
     def __init__(self, repo: JobRepository | None = None) -> None:
         self.repo = repo or JobRepository()
 
-    def list(self, db, status: str | None = None, limit: int = 50, offset: int = 0) -> list[JobOut]:
+    def list(
+        self,
+        db,
+        status: str | None = None,
+        location_id=None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[JobOut]:
         return [
             JobOut.model_validate(job)
-            for job in self.repo.list(db, status=status, limit=limit, offset=offset)
+            for job in self.repo.list(
+                db, status=status, location_id=location_id, limit=limit, offset=offset
+            )
         ]
 
     def get(self, db, job_id) -> JobOut:

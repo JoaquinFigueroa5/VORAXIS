@@ -153,6 +153,8 @@
 .shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  /* The header scrolls sideways on a phone; without this its content widens the page. */
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
 }
 
@@ -1446,7 +1448,8 @@ html.m-enter [data-enter] .result {
   padding-top: 0;
 }
 
-.evidence .glyph {
+.evidence .glyph,
+.source .glyph {
   width: 32px;
   height: 32px;
   display: grid;
@@ -1480,6 +1483,8 @@ html.m-enter [data-enter] .result {
 
 .explore .figure {
   font-size: 36px;
+  /* The big number and its label share a line; without a gap they touch. */
+  margin-right: 6px;
 }
 
 .picks {
@@ -2055,5 +2060,195 @@ html.m-enter [data-enter] .result {
 
   .statement .w.strong {
     color: var(--color-accent);
+  }
+}
+
+/* ---------- evidence center, insights, methodology ---------- */
+
+/* These pages carry tables of indicators and long prose; the wizard's 560px is too narrow. */
+.page .inner.wide,
+.page .inner.prose {
+  max-width: 820px;
+}
+
+/* On a full page a section is a band with a top rule, not a rail cell. */
+.page .block {
+  padding: 28px 0;
+  border-top: 1px solid var(--color-line);
+  border-bottom: 0;
+}
+
+.page .block:first-of-type {
+  border-top: 0;
+}
+
+/* Selected chips and the mode switch: mint is the selection, as everywhere else. */
+.btn.tonal.small[aria-pressed="true"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.prose h1 {
+  margin-top: 6px;
+  font-size: var(--t-h2);
+}
+
+.prose h2 {
+  margin-bottom: 12px;
+  font-size: var(--t-h3);
+  letter-spacing: -0.02em;
+}
+
+.prose h3 {
+  margin-bottom: 10px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.prose p,
+.prose li {
+  max-width: 68ch;
+  color: var(--color-muted);
+  font-size: var(--t-body);
+  line-height: 1.6;
+}
+
+.prose strong {
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+/* A hypothesis, not a badge: the colour sits on the edge and the title. */
+.verdict {
+  margin-top: 24px;
+  padding: 20px 22px;
+  border-left: 3px solid var(--color-line);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  background: var(--color-surface);
+}
+
+.verdict h2 {
+  margin-top: 6px;
+  font-size: var(--t-h3);
+  letter-spacing: -0.02em;
+}
+
+/* Distribution: label and figure on one line, the bar underneath both. */
+.distro {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.distro__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: center;
+  font-size: var(--t-small);
+}
+
+.distro__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.distro .swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 3px;
+}
+
+.distro__meter {
+  grid-column: 1 / -1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-surface);
+}
+
+.distro__meter i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
+
+/* One card per source: a source that did not answer looks different, not empty. */
+.sources {
+  display: grid;
+  /* Two per row at this width, so four sources are a square instead of 3 + 1. */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.source {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--r-sm);
+  font-size: var(--t-small);
+}
+
+.source[data-state="UNAVAILABLE"],
+.source[data-state="NOT_CONFIGURED"] {
+  border-style: dashed;
+  color: var(--color-muted);
+}
+
+/* Ordered or not, every list in the copy reads as flat points with a rule each. */
+.steps-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.steps-list li {
+  position: relative;
+  padding-left: 20px;
+}
+
+.steps-list li::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-ink);
+}
+
+.facts.wide {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+/* The header cannot wrap: on a phone it scrolls sideways instead of losing sections. */
+@media (max-width: 760px) {
+  .nav-in {
+    gap: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .nav-in::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav .links {
+    flex: none;
+  }
+
+  .page .inner.wide,
+  .page .inner.prose {
+    padding: 72px var(--gutter);
   }
 }

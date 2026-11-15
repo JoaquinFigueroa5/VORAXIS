@@ -145,6 +145,12 @@ def run(db, context) -> None:
         )
         change = db.get(ChangeEvent, change_id)
         change.change_type = result.change_type
+        change.classification = {
+            "type": result.change_type,
+            "label": result.label,
+            "confidence": result.confidence,
+            "reasons": result.reasons,
+        }
         types[result.change_type] = types.get(result.change_type, 0) + 1
 
     context.change_types = types

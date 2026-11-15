@@ -13,6 +13,7 @@ from sqlalchemy import (
     Uuid,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -51,6 +52,8 @@ class ChangeEvent(Base):
     # DECREASE (darker) / INCREASE (brighter) and the signed mean change in dB.
     direction: Mapped[str | None] = mapped_column(String(10))
     mean_change_db: Mapped[float | None] = mapped_column(Float)
+    # Why the classifier said what it said: {type, label, confidence, reasons}.
+    classification: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

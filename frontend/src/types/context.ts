@@ -15,6 +15,8 @@ export interface NisarGranule {
   frame: number | null;
   flight_direction: string | null;
   polarization: string[] | null;
+  /** PROVISIONAL, BETA... as ASF reports it */
+  maturity: string | null;
   processing_version: string | null;
   start: string;
   stop: string | null;
@@ -31,6 +33,8 @@ export interface NisarPair {
   frame: number;
   flight_direction: string;
   polarization: string[];
+  /** Both sides share it: ingestion refuses a pair that mixes maturities */
+  maturity: string | null;
   before: { product_id: string; start: string };
   after: { product_id: string; start: string };
   interval_days: number;

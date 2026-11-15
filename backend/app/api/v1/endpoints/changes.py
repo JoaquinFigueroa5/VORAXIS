@@ -6,10 +6,12 @@ from fastapi import APIRouter, Query, Response
 from app.dependencies import DbSession, Offset
 from app.schemas.change import ChangeEventOut, ChangeMetricOut
 from app.services.change_service import ChangeService
+from app.services.interpretation_service import InterpretationService
 from app.utils.geometry import parse_bbox
 
 router = APIRouter(prefix="/changes", tags=["changes"])
 service = ChangeService()
+interpretation = InterpretationService()
 
 Bbox = Annotated[str | None, Query(description="minx,miny,maxx,maxy")]
 ChangeType = Annotated[
@@ -82,3 +84,9 @@ def get_change(change_id: uuid.UUID, db: DbSession) -> ChangeEventOut:
 @router.get("/{change_id}/metrics", response_model=list[ChangeMetricOut])
 def get_metrics(change_id: uuid.UUID, db: DbSession) -> list[ChangeMetricOut]:
     return service.metrics(db, change_id)
+
+
+@router.get("/{change_id}/interpretation")
+def get_interpretation(change_id: uuid.UUID, db: DbSession) -> dict[str, Any]:
+    """What was measured, what it suggests, which sources answered and what is missing."""
+    return interpretation.for_change(db, change_id)

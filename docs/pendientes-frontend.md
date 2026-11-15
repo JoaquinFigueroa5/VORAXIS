@@ -27,7 +27,10 @@ Todo lo nuevo vive en `frontend/src/observatory/`:
 | `ChangePanel.tsx` | Detalle de un cambio: métricas y evidencia |
 | `IntervalStrip.tsx` | Tira de lluvia, focos y sismos entre las dos fechas |
 | `NewAnalysisPage.tsx` | Asistente de nuevo análisis (`/nuevo`) |
-| `ExplorePage.tsx` | Explorar un punto (`/explorar`) |
+| `ExplorePage.tsx` | Explorar un punto (`/explorar`): filtros del catálogo, capas del mapa y cambios ya analizados en el radio |
+| `EvidencePage.tsx` | Evidence Center (`/analisis/:id/evidencia/:changeId`): interpretación, evidencia vinculada y estado de cada fuente |
+| `InsightsPage.tsx` | Global Insights (`/insights`): distribuciones globales o «datos insuficientes» |
+| `MethodologyPage.tsx` | Data & Methodology (`/metodologia`): qué mide el radar, cómo se calcula y qué no se puede concluir |
 | `DownloadsMenu.tsx`, `downloads.ts` | Menú "Descargas" de la barra y lógica de tareas de ingesta |
 | `basemap.tsx` | Selector de mapa base (gris, satélite, NASA) |
 | `lib.ts` | Tipos de cambio, formatos de fecha, área y dB |
@@ -84,6 +87,8 @@ Estilos en `frontend/src/assets/styles/globals.css`. Los servicios de la API est
 - **El worker hace una tarea a la vez**: descargas y análisis comparten cola. Un análisis lanzado durante una descarga espera a que termine.
 - **Descargas**: el backend no guarda qué tareas forman un par. `groupBatches` las agrupa por zona y por haber entrado a la cola con menos de 5 s de diferencia.
 - **Polling**: las consultas usan TanStack Query. `["ingest"]` se refresca cada 2,5 s si hay algo activo y `["jobs"]` cada 4 a 10 s. Reusar esas claves en vez de crear otras.
-- **Capturas**: el panel del navegador integrado suele estar oculto y no dibuja. Para capturas, desde `frontend/`:
-  `node ../.claude/skills/design-taste-frontend/scripts/shoot.mjs --url <url> --w 1440 --h 900 --wait 8000 --out <png> --profile .taste-skill/chrome-check --no-tiles`
+- **Capturas**: el panel del navegador integrado suele estar oculto y no dibuja. Con Chrome headless:
+  `chrome --headless=new --screenshot=<png> --window-size=1440,900 --virtual-time-budget=12000 --user-data-dir=<perfil único> <url>`
+  (un `--user-data-dir` distinto por corrida, o las ejecuciones se cuelgan). Por debajo de 500 px
+  de ancho Chrome recorta; hay que emular el viewport con CDP.
 - **Credenciales**: están en `VORAXIS/.env`. Nunca copiarlas a `.env.example` ni al código.

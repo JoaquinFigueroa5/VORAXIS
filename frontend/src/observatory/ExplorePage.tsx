@@ -5,14 +5,16 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { Link, useSearchParams } from "react-router-dom";
 
 import { BASEMAPS, BasemapSwitch, applyBasemap, basemapSources, useBasemap } from "@/observatory/basemap";
-import { boundsCenter, geometryBounds, number, shortDate } from "@/observatory/lib";
+import { CHANGE_TYPES, area, boundsCenter, geometryBounds, number, shortDate, typeStyle } from "@/observatory/lib";
 import {
   Map as MapLibreMap,
   NavigationControl,
+  type ExpressionSpecification,
   type GeoJSONSource,
   type MapMouseEvent,
 } from "@/observatory/maplibre";
 import { ApiError } from "@/services/api";
+import { changesService } from "@/services/changes.service";
 import { contextService } from "@/services/context.service";
 import { locationsService } from "@/services/locations.service";
 
@@ -22,6 +24,14 @@ const FIRE_DAYS = 30; // FIRMS answers at most 31 days per request
 const HEAVY_RAIN_MM = 20;
 
 const COLOR = { quake: "#b0305c", fire: "#d2571b", rain: "#1f6fb2", nisar: "#232323" };
+
+// Same palette as the analysis map; a type the classifier never emits falls back to grey.
+const TYPE_COLOR = [
+  "match",
+  ["get", "change_type"],
+  ...Object.entries(CHANGE_TYPES).flatMap(([type, style]) => [type, style.color]),
+  "#7a7a7a",
+] as unknown as ExpressionSpecification;
 
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
@@ -98,6 +108,41 @@ interface TimelineRow {
   detail: string;
 }
 
+/** One filter row: an "all" chip plus whatever values the catalogue returned. */
+function Chips({
+  label,
+  values,
+  value,
+  onChange,
+}: {
+  label: string;
+  values: string[];
+  value: string | null;
+  onChange: (value: string | null) => void;
+}) {
+  if (values.length < 2) return null;
+  return (
+    <div style={{ display: "grid", gap: 6, marginTop: 12 }}>
+      <p className="label">{label}</p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <button className="btn tonal small" aria-pressed={value === null} onClick={() => onChange(null)}>
+          Todos
+        </button>
+        {values.map((option) => (
+          <button
+            key={option}
+            className="btn tonal small"
+            aria-pressed={value === option}
+            onClick={() => onChange(value === option ? null : option)}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function ExplorePage() {
   const [params, setParams] = useSearchParams();
   const lat = params.get("lat") !== null ? Number(params.get("lat")) : null;
@@ -153,6 +198,59 @@ export function ExplorePage() {
     retry: false,
   });
 
+  // Only the values ASF actually returned are offered as filters.
+  const [filters, setFilters] = useState<{
+    maturity: string | null;
+    direction: string | null;
+    polarization: string | null;
+  }>({ maturity: null, direction: null, polarization: null });
+
+  const granules = useMemo(() => nisar.data?.granules ?? [], [nisar.data]);
+  const options = useMemo(
+    () => ({
+      maturity: [...new Set(granules.map((granule) => granule.maturity).filter(Boolean) as string[])],
+      direction: [...new Set(granules.map((granule) => granule.flight_direction).filter(Boolean) as string[])],
+      polarization: [...new Set(granules.flatMap((granule) => granule.polarization ?? []))],
+    }),
+    [granules],
+  );
+  const visible = useMemo(
+    () =>
+      granules.filter(
+        (granule) =>
+          (!filters.maturity || granule.maturity === filters.maturity) &&
+          (!filters.direction || granule.flight_direction === filters.direction) &&
+          (!filters.polarization || (granule.polarization ?? []).includes(filters.polarization)),
+      ),
+    [granules, filters],
+  );
+  const pairs = useMemo(
+    () =>
+      (nisar.data?.comparable_pairs ?? []).filter(
+        (pair) =>
+          (!filters.maturity || pair.maturity === filters.maturity) &&
+          (!filters.direction || pair.flight_direction === filters.direction) &&
+          (!filters.polarization || pair.polarization.includes(filters.polarization)),
+      ),
+    [nisar.data, filters],
+  );
+
+  /** Changes already detected inside the circle; drawn as polygons, linked to their analysis. */
+  const bbox = useMemo(() => {
+    if (!point) return null;
+    const ring = circle(point.lon, point.lat, radius);
+    const [west, south, east, north] = geometryBounds(ring.geometry as never);
+    return `${west},${south},${east},${north}`;
+  }, [point?.lat, point?.lon, radius]); // eslint-disable-line react-hooks/exhaustive-deps
+  const changes = useQuery({
+    queryKey: ["ctx", "changes", bbox],
+    queryFn: () => changesService.geojson({ bbox: bbox as string, limit: 500 }),
+    enabled: Boolean(bbox),
+    retry: false,
+  });
+
+  const [layers, setLayers] = useState({ changes: true, fires: true, quakes: true });
+
   // ---- basemap: swap it in place; lines turn white over imagery
   useEffect(() => {
     const instance = map.current;
@@ -172,6 +270,7 @@ export function ExplorePage() {
         sources: {
           ...basemapSources(builtBasemap.current),
           frames: { type: "geojson", data: EMPTY },
+          changes: { type: "geojson", data: EMPTY },
           radius: { type: "geojson", data: EMPTY },
           quakes: { type: "geojson", data: EMPTY },
           fires: { type: "geojson", data: EMPTY },
@@ -183,6 +282,24 @@ export function ExplorePage() {
           { id: "frames-line", type: "line", source: "frames", paint: { "line-color": BASEMAPS[builtBasemap.current].ink, "line-width": 1, "line-opacity": 0.45, "line-dasharray": [3, 2] } },
           { id: "radius-fill", type: "fill", source: "radius", paint: { "fill-color": "#a1ffcb", "fill-opacity": 0.16 } },
           { id: "radius-line", type: "line", source: "radius", paint: { "line-color": BASEMAPS[builtBasemap.current].ink, "line-width": 1.5 } },
+          {
+            id: "changes-fill",
+            type: "fill",
+            source: "changes",
+            paint: {
+              "fill-color": TYPE_COLOR,
+              "fill-opacity": 0.32,
+            },
+          },
+          {
+            id: "changes-line",
+            type: "line",
+            source: "changes",
+            paint: {
+              "line-color": TYPE_COLOR,
+              "line-width": 1.4,
+            },
+          },
           { id: "labels", type: "raster", source: "labels" },
           {
             id: "fires",
@@ -249,11 +366,11 @@ export function ExplorePage() {
     fromMap.current = false;
   }, [ready, point?.lat, point?.lon, radius]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // NISAR frames: the newest GCOV acquisition of each track and frame over the point.
+  // NISAR frames: the newest acquisition of each track and frame over the point.
   const frames = useMemo(() => {
     const seen = new Set<string>();
     const features: Feature[] = [];
-    for (const granule of nisar.data?.granules ?? []) {
+    for (const granule of visible) {
       if (granule.level !== "GCOV" || !granule.footprint) continue;
       const key = `${granule.track}-${granule.frame}`;
       if (seen.has(key)) continue;
@@ -261,11 +378,14 @@ export function ExplorePage() {
       features.push({ type: "Feature", properties: { track: granule.track }, geometry: granule.footprint as Geometry });
     }
     return features;
-  }, [nisar.data]);
+  }, [visible]);
 
   useEffect(() => {
     if (!ready) return;
     source("frames")?.setData({ type: "FeatureCollection", features: point ? frames : [] });
+    source("changes")?.setData(
+      point && changes.data ? changes.data : EMPTY,
+    );
     source("quakes")?.setData({
       type: "FeatureCollection",
       features: point
@@ -286,7 +406,19 @@ export function ExplorePage() {
           }))
         : [],
     });
-  }, [ready, point, frames, quakes.data, fires.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ready, point, frames, changes.data, quakes.data, fires.data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Layer manager: hide and show without rebuilding the style.
+  useEffect(() => {
+    const instance = map.current;
+    if (!ready || !instance) return;
+    const visibility = (ids: string[], on: boolean) => {
+      for (const id of ids) instance.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+    };
+    visibility(["changes-fill", "changes-line"], layers.changes);
+    visibility(["fires"], layers.fires);
+    visibility(["quakes"], layers.quakes);
+  }, [ready, layers]);
 
   // ---- everything that happened, newest first
   const timeline = useMemo<TimelineRow[]>(() => {
@@ -329,7 +461,6 @@ export function ExplorePage() {
   }, [nisar.data, quakes.data, rain.data, fires.data, radius]);
 
   const latestGcov = nisar.data?.latest_by_level?.GCOV;
-  const pairs = nisar.data?.comparable_pairs ?? [];
   const series = rain.data?.series ?? [];
   const peak = Math.max(1, ...series.map((day) => day.mm ?? 0));
   const elevation = rain.data?.elevation_m;
@@ -383,6 +514,88 @@ export function ExplorePage() {
                 onChange={(option) => update({ radio: option })}
               />
             </div>
+
+            {options.maturity.length + options.direction.length + options.polarization.length > 1 ? (
+              <section className="block" aria-labelledby="filtros">
+                <h2 id="filtros">Filtros</h2>
+                <Chips
+                  label="Órbita"
+                  values={options.direction}
+                  value={filters.direction}
+                  onChange={(value) => setFilters((current) => ({ ...current, direction: value }))}
+                />
+                <Chips
+                  label="Madurez"
+                  values={options.maturity}
+                  value={filters.maturity}
+                  onChange={(value) => setFilters((current) => ({ ...current, maturity: value }))}
+                />
+                <Chips
+                  label="Polarización"
+                  values={options.polarization}
+                  value={filters.polarization}
+                  onChange={(value) => setFilters((current) => ({ ...current, polarization: value }))}
+                />
+                <p className="label" style={{ marginTop: 10 }}>
+                  {number(visible.length, 0)} de {number(granules.length, 0)} productos del catálogo.
+                </p>
+              </section>
+            ) : null}
+
+            <section className="block" aria-labelledby="capas">
+              <h2 id="capas">Capas del mapa</h2>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={layers.changes}
+                  onChange={(event) => setLayers((current) => ({ ...current, changes: event.target.checked }))}
+                />
+                Cambios detectados
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={layers.fires}
+                  onChange={(event) => setLayers((current) => ({ ...current, fires: event.target.checked }))}
+                />
+                Incendios (FIRMS)
+              </label>
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={layers.quakes}
+                  onChange={(event) => setLayers((current) => ({ ...current, quakes: event.target.checked }))}
+                />
+                Sismos (USGS)
+              </label>
+            </section>
+
+            {changes.data && changes.data.features.length > 0 ? (
+              <section className="block" aria-labelledby="cambios-zona">
+                <h2 id="cambios-zona">Cambios ya analizados aquí</h2>
+                <p className="quiet" style={{ marginTop: 8 }}>
+                  {number(changes.data.numberMatched, 0)} polígonos dentro del radio de {radius} km.
+                </p>
+                {[...changes.data.features]
+                  .sort((a, b) => (b.properties.area_km2 ?? 0) - (a.properties.area_km2 ?? 0))
+                  .slice(0, 5)
+                  .map((feature) => (
+                    <Link
+                      key={feature.properties.id}
+                      className="changerow"
+                      to={`/analisis/${feature.properties.job_id}`}
+                      style={{ textDecoration: "none" }}
+                    >
+                      <span className="dot" style={{ background: typeStyle(feature.properties.change_type).color }} />
+                      <span>
+                        {area(feature.properties.area_km2)}
+                        <span className="quiet"> {feature.properties.label.replace("Posible ", "")}</span>
+                      </span>
+                      <span className="num">{feature.properties.mean_change_db?.toFixed(1)} dB</span>
+                    </Link>
+                  ))}
+              </section>
+            ) : null}
 
             <Section icon={glyph.nisar} color={COLOR.nisar} title="Pasadas del radar NISAR">
               {nisar.isLoading ? <p className="quiet">Buscando en el catálogo de NASA…</p> : null}

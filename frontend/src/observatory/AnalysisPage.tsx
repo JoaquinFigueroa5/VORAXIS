@@ -12,6 +12,8 @@ import { contextService } from "@/services/context.service";
 import { insightsService } from "@/services/insights.service";
 import { jobsService } from "@/services/jobs.service";
 import { locationsService } from "@/services/locations.service";
+import { observationsService } from "@/services/observations.service";
+import { useInterface } from "@/stores/interface";
 import type { TileDescription } from "@/types/change";
 import { FINAL_JOB_STATUSES } from "@/types/job";
 
@@ -40,6 +42,7 @@ export function AnalysisPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [focus, setFocus] = useState<Bounds | null>(null);
   const [order, setOrder] = useState<"area" | "score">("area");
+  const scientific = useInterface((state) => state.scientific);
 
   const job = useQuery({
     queryKey: ["job", id],
@@ -67,6 +70,13 @@ export function AnalysisPage() {
     queryFn: () => locationsService.get(job.data?.location_id as string),
     enabled: Boolean(job.data?.location_id),
   });
+  // The before-side observation carries the product metadata the header shows.
+  const beforeObservation = useQuery({
+    queryKey: ["observation", job.data?.before_observation_id],
+    queryFn: () => observationsService.get(job.data?.before_observation_id as string),
+    enabled: Boolean(job.data?.before_observation_id),
+    staleTime: Infinity,
+  });
 
   const shown = useMemo(
     () => (insights.data?.by_type ?? []).map((row) => row.change_type).filter((type) => !hidden.includes(type)),
@@ -80,6 +90,10 @@ export function AnalysisPage() {
 
   const before = insights.data?.acquisitions.before ?? null;
   const after = insights.data?.acquisitions.after ?? null;
+  const intervalDays = useMemo(() => {
+    if (!before || !after) return null;
+    return (new Date(after).getTime() - new Date(before).getTime()) / 86_400_000;
+  }, [before, after]);
   const centre = useMemo(
     () => (location.data ? boundsCenter(geometryBounds(location.data.geometry)) : null),
     [location.data],
@@ -166,6 +180,61 @@ export function AnalysisPage() {
                 con cambios, en {number(totals.changes, 0)} áreas. Señal {String(job.data.result?.polarization ?? "HH")},
                 umbral de {number(totals.threshold_db, 1)} dB.
               </p>
+              <dl className="facts" style={{ marginTop: 20 }}>
+                <div>
+                  <dt>Área afectada</dt>
+                  <dd className="num">{area(totals.area_km2)}</dd>
+                </div>
+                <div>
+                  <dt>Intensidad relativa</dt>
+                  <dd className="num">{number(totals.mean_score, 2)}</dd>
+                </div>
+                <div>
+                  <dt>Píxeles válidos</dt>
+                  <dd className="num">
+                    {totals.valid_pixel_percentage != null
+                      ? `${number(totals.valid_pixel_percentage, 1)} %`
+                      : "sin dato"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Intervalo</dt>
+                  <dd className="num">
+                    {intervalDays != null ? `${number(intervalDays, 0)} días` : "sin dato"}
+                  </dd>
+                </div>
+              </dl>
+              {scientific ? (
+                <dl className="facts" style={{ marginTop: 16 }}>
+                  <div>
+                    <dt>Producto</dt>
+                    <dd className="num">{beforeObservation.data?.product_type ?? "sin dato"}</dd>
+                  </div>
+                  <div>
+                    <dt>Madurez</dt>
+                    <dd className="num">{beforeObservation.data?.maturity ?? "sin dato"}</dd>
+                  </div>
+                  <div>
+                    <dt>Polarización</dt>
+                    <dd className="num">
+                      {beforeObservation.data?.polarization?.join(" · ") ??
+                        String(job.data.result?.polarization ?? "sin dato")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Órbita</dt>
+                    <dd className="num">{beforeObservation.data?.orbit_direction ?? "sin dato"}</dd>
+                  </div>
+                  <div>
+                    <dt>Versión de proceso</dt>
+                    <dd className="num">{beforeObservation.data?.processing_version ?? "sin dato"}</dd>
+                  </div>
+                  <div>
+                    <dt>Análisis</dt>
+                    <dd className="num">{id.slice(0, 8)}</dd>
+                  </div>
+                </dl>
+              ) : null}
             </>
           ) : null}
         </div>

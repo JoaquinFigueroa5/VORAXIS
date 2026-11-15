@@ -15,6 +15,8 @@ class ChangeEventOut(ORMModel):
     valid_pixel_percentage: float | None = None
     direction: str | None = None  # DECREASE | INCREASE
     mean_change_db: float | None = None
+    # {type, label, confidence, reasons}: tentative, never a probability.
+    classification: dict[str, Any] | None = None
     created_at: datetime
 
 

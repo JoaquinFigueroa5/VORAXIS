@@ -23,6 +23,55 @@ AREA_BINS_KM2 = (0.05, 0.1, 0.5, 1.0, 5.0)
 
 class InsightsService:
     def summary(self, db) -> InsightsOut:
+        area = func.coalesce(func.sum(ChangeEvent.area_km2), 0.0)
+        # Distributions stay empty until there is something to distribute: the client
+        # shows "not enough data" instead of inventing a chart.
+        by_type = [
+            {
+                "change_type": change_type,
+                "label": LABELS_ES.get(change_type, change_type),
+                "count": count,
+                "area_km2": round(total or 0.0, 3),
+            }
+            for change_type, count, total in db.execute(
+                select(ChangeEvent.change_type, func.count(), area)
+                .group_by(ChangeEvent.change_type)
+                .order_by(func.count().desc())
+            )
+        ]
+        by_direction = [
+            {"direction": direction, "count": count, "area_km2": round(total or 0.0, 3)}
+            for direction, count, total in db.execute(
+                select(ChangeEvent.direction, func.count(), area).group_by(ChangeEvent.direction)
+            )
+        ]
+        by_month = [
+            {"month": month, "count": count, "area_km2": round(total or 0.0, 3)}
+            for month, count, total in db.execute(
+                select(
+                    func.to_char(ChangeEvent.created_at, "YYYY-MM").label("month"),
+                    func.count(),
+                    area,
+                )
+                .group_by("month")
+                .order_by("month")
+            )
+        ]
+        by_location = [
+            {
+                "location_id": str(location_id),
+                "name": name,
+                "count": count,
+                "area_km2": round(total or 0.0, 3),
+            }
+            for location_id, name, count, total in db.execute(
+                select(Location.id, Location.name, func.count(), area)
+                .join(ProcessingJob, ProcessingJob.location_id == Location.id)
+                .join(ChangeEvent, ChangeEvent.job_id == ProcessingJob.id)
+                .group_by(Location.id, Location.name)
+                .order_by(func.count().desc())
+            )
+        ]
         return InsightsOut(
             locations=db.execute(select(func.count()).select_from(Location)).scalar_one(),
             scenes=NisarRepository().count(db),
@@ -32,6 +81,10 @@ class InsightsService:
             change_area_km2=round(ChangeRepository().total_area_km2(db), 3),
             evidence_records=EvidenceRepository().count(db),
             auxiliary_events=EvidenceRepository().count_auxiliary(db),
+            by_type=by_type,
+            by_direction=by_direction,
+            by_month=by_month,
+            by_location=by_location,
         )
 
     def for_job(self, db, job_id) -> dict[str, Any]:

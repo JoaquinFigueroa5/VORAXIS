@@ -14,7 +14,16 @@ export interface ChangeEvent {
   direction: ChangeDirection | null;
   /** Signed mean backscatter change in dB */
   mean_change_db: number | null;
+  /** Why the classifier said so. Tentative: `confidence` is LOW/MEDIUM/NONE, never a probability. */
+  classification: ChangeClassification | null;
   created_at: string;
+}
+
+export interface ChangeClassification {
+  type: string;
+  label?: string | null;
+  confidence: "NONE" | "LOW" | "MEDIUM" | null;
+  reasons: string[];
 }
 
 export interface ChangeMetric {

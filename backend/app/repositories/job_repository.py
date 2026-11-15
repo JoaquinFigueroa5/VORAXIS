@@ -12,11 +12,19 @@ class JobRepository:
         return db.get(ProcessingJob, job_id)
 
     def list(
-        self, db: Session, *, status: str | None = None, limit: int = 50, offset: int = 0
+        self,
+        db: Session,
+        *,
+        status: str | None = None,
+        location_id=None,
+        limit: int = 50,
+        offset: int = 0,
     ) -> Sequence[ProcessingJob]:
         stmt = select(ProcessingJob)
         if status:
             stmt = stmt.where(ProcessingJob.status == status.upper())
+        if location_id:
+            stmt = stmt.where(ProcessingJob.location_id == location_id)
         stmt = stmt.order_by(ProcessingJob.created_at.desc()).limit(limit).offset(offset)
         return db.execute(stmt).scalars().all()
 
