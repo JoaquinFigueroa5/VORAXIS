@@ -48,8 +48,11 @@ backend, reconstruye ambas (`docker compose build backend worker`).
 ## Estado actual
 
 Implementado: esquema completo, catálogo, AOIs, validación de pares, cola,
-pipeline GCOV (diferencia → polígonos → métricas → COG), evidencia USGS,
-endpoints de lectura y mapa.
+pipeline GCOV (diferencia → polígonos → métricas → COG), evidencia USGS, FIRMS
+y NASA POWER, clasificación tentativa `POSSIBLE_*` persistida con sus razones,
+tiles vectoriales y ráster, contexto en vivo por punto e interpretación de un
+cambio (`GET /changes/{id}/interpretation`).
 
-No implementado a propósito: alineación/remuestreo, GUNW/GOFF/SME2, tiles XYZ
-(responde 501), FIRMS/GPM. Ver `docs/architecture.md`.
+No implementado a propósito: alineación/remuestreo fino, GUNW/GOFF/SME2 y
+evolución histórica por cambio. La etiqueta `POSSIBLE_*` es una hipótesis, no un
+diagnóstico. Ver `docs/architecture.md`.

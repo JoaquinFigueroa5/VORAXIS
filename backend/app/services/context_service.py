@@ -120,6 +120,7 @@ def trim_granule(product: dict[str, Any]) -> dict[str, Any]:
         "frame": product.get("frameNumber"),
         "flight_direction": product.get("flightDirection"),
         "polarization": _polarization(product),
+        "maturity": product.get("maturity") or product.get("productVersion"),
         "processing_version": product.get("crid"),
         "start": start,
         "stop": product.get("stopTime"),
@@ -132,7 +133,7 @@ def trim_granule(product: dict[str, Any]) -> dict[str, Any]:
 
 
 def comparable_pairs(granules: list[dict[str, Any]], limit: int = 25) -> list[dict[str, Any]]:
-    """Consecutive GCOV acquisitions of the same track, frame, direction and polarisation.
+    """Consecutive GCOV acquisitions of the same track, frame, direction, polarisation and maturity.
 
     These are the before/after pairs the change analysis can use directly.
     """
@@ -145,11 +146,12 @@ def comparable_pairs(granules: list[dict[str, Any]], limit: int = 25) -> list[di
             granule["frame"],
             granule["flight_direction"],
             tuple(granule["polarization"] or ()),
+            granule["maturity"] if "maturity" in granule else None,  # ingestion refuses a mixed pair
         )
         groups[key].append(granule)
 
     pairs = []
-    for (track, frame, direction, polarization), members in groups.items():
+    for (track, frame, direction, polarization, maturity), members in groups.items():
         members.sort(key=lambda g: g["start"])
         for before, after in zip(members, members[1:], strict=False):
             first = datetime.fromisoformat(before["start"].replace("Z", "+00:00"))
@@ -163,6 +165,7 @@ def comparable_pairs(granules: list[dict[str, Any]], limit: int = 25) -> list[di
                     "frame": frame,
                     "flight_direction": direction,
                     "polarization": list(polarization),
+                    "maturity": maturity,
                     "before": {"product_id": before["product_id"], "start": before["start"]},
                     "after": {"product_id": after["product_id"], "start": after["start"]},
                     "interval_days": interval,

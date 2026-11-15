@@ -16,7 +16,7 @@ Base: `http://localhost:8000/api/v1` · OpenAPI: `/docs`.
 | POST | `/ingest` | implementado (encola descarga + conversión) |
 | GET | `/ingest`, `/ingest/{id}` | implementado (estado, etapa y progreso) |
 | POST | `/analysis` | implementado (encola) |
-| GET | `/jobs` | implementado |
+| GET | `/jobs` (`status`, `location_id`, `limit`, `offset`) | implementado |
 | GET | `/jobs/{id}` | implementado |
 | POST | `/jobs/{id}/cancel` | implementado |
 | GET | `/jobs/{id}/insights` | implementado (agregados para gráficos) |
@@ -25,6 +25,7 @@ Base: `http://localhost:8000/api/v1` · OpenAPI: `/docs`.
 | GET | `/changes/geojson` (mismos filtros + `zoom`) | implementado (capa de mapa) |
 | GET | `/changes/{id}` | implementado |
 | GET | `/changes/{id}/metrics` | implementado |
+| GET | `/changes/{id}/interpretation` | implementado (clasificación, métricas, evidencia y estado de cada fuente) |
 | GET | `/changes/{id}/evidence` | implementado |
 | GET | `/changes/{id}/tiles` · `/jobs/{id}/tiles` | implementado (URLs, bounds, leyenda) |
 | GET | `/changes/{id}/tiles/{z}/{x}/{y}?layer=` · `/jobs/{id}/tiles/{z}/{x}/{y}?layer=` | implementado (PNG) |
@@ -141,7 +142,10 @@ inválidas, `409` al cancelar un trabajo ya terminado.
 `GET /changes` devuelve una página (hasta `limit=1000`) y el total que cumple los
 filtros en la cabecera **`X-Total-Count`**. Cada cambio incluye `direction`
 (`DECREASE` = se oscureció, `INCREASE` = se aclaró) y `mean_change_db`, así que el
-mapa se puede colorear sin pedir las métricas.
+mapa se puede colorear sin pedir las métricas. También trae `classification`:
+`{type, label, confidence, reasons}` tal como lo guardó el clasificador.
+`confidence` es `NONE`, `LOW` o `MEDIUM` — una hipótesis con la evidencia que la
+sostiene, nunca una probabilidad.
 
 | Filtro | Ejemplo |
 |---|---|
@@ -189,6 +193,34 @@ En el front: `changesService.page(filtros)` devuelve `{ items, total }`;
 
 En el front: `insightsService.forJob(jobId)`.
 
+## Interpretación de un cambio
+
+`GET /changes/{id}/interpretation` reúne en una sola respuesta lo que ya está
+guardado sobre ese polígono; no infiere nada nuevo:
+
+| Campo | Contenido |
+|---|---|
+| `status` | `COMPLETE` solo si todas las fuentes respondieron y el cambio está clasificado; si no, `PARTIAL` |
+| `period` | fechas de las dos adquisiciones e `interval_days` |
+| `observation` | producto, tipo, madurez, polarización, órbita y versión de proceso de la fecha inicial |
+| `change` | tipo, etiqueta en español, área, score, % válido, dirección y cambio medio en dB |
+| `classification` | `confidence` y `reasons`: por qué el clasificador propuso esa etiqueta |
+| `metrics` | métricas del polígono con nombre, etiqueta y unidad |
+| `evidence` | eventos auxiliares vinculados, con distancia y diferencia temporal |
+| `sources` | estado por fuente: `AVAILABLE`, `UNAVAILABLE` o `NOT_CONFIGURED`, y cuántos eventos encontró |
+| `limitations` | frases ya redactadas sobre lo que no se puede concluir, incluida la fuente que faltó |
+
+En el front: `interpretationService.forChange(changeId)`.
+
+## Insights globales
+
+`GET /insights` devuelve los totales (ubicaciones, escenas, observaciones, jobs por
+estado, cambios, área, evidencias, eventos auxiliares) y cuatro distribuciones
+sobre todos los análisis: `by_type`, `by_direction`, `by_month` (mes de proceso) y
+`by_location`. Cada fila lleva conteo y `area_km2`; las listas quedan vacías
+mientras no haya cambios, y la interfaz muestra «datos insuficientes» en vez de
+una gráfica con dos puntos.
+
 ## Contexto por punto (`/context/*`)
 
 Consultas en vivo para **cualquier** coordenada, sin escena ingerida ni ubicación
@@ -205,8 +237,8 @@ días) o `start`/`end` (`YYYY-MM-DD`, para una ventana pasada). Cada respuesta t
 | `/context/timeline` | todo lo anterior por fecha, del más reciente al más antiguo: adquisiciones GCOV, sismos, días de lluvia ≥ 20 mm y días con focos. `sources` indica qué fuente respondió |
 
 - **`comparable_pairs`** son parejas de fechas GCOV consecutivas del mismo track,
-  frame, dirección y polarización: los pares antes/después que el análisis puede usar.
-  Indican `interval_days`, `download_gb` y `same_processing_version`.
+  frame, dirección, polarización y madurez: los pares antes/después que el análisis
+  puede usar. Indican `interval_days`, `download_gb` y `same_processing_version`.
 - Las respuestas se cachean 10 minutos (`CONTEXT_CACHE_TTL`, en segundos).
 - Errores: `502` si la fuente no responde o falta su clave (FIRMS), con el motivo en
   `detail`; `400` por ventana inválida. En `timeline` una fuente caída no es error:

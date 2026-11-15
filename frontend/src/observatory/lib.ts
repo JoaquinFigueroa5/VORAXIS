@@ -127,12 +127,3 @@ export function geometryBounds(geometry: Polygon | MultiPolygon): Bounds {
 export function boundsCenter([west, south, east, north]: Bounds): { lon: number; lat: number } {
   return { lon: (west + east) / 2, lat: (south + north) / 2 };
 }
-
-/** How strong a change is, in words. Mirrors the thresholds the API documents. */
-export function significance(score: number | null, km2: number | null): string {
-  const s = score ?? 0;
-  const a = km2 ?? 0;
-  if (s >= 0.6 || (s >= 0.25 && a >= 5)) return "Alta";
-  if (s >= 0.3 || a >= 1) return "Moderada";
-  return "Baja";
-}

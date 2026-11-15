@@ -33,3 +33,8 @@ class InsightsOut(BaseModel):
     change_area_km2: float
     evidence_records: int
     auxiliary_events: int
+    # Distributions across every analysis; empty when nothing has been detected yet.
+    by_type: list[dict[str, Any]] = []
+    by_direction: list[dict[str, Any]] = []
+    by_month: list[dict[str, Any]] = []
+    by_location: list[dict[str, Any]] = []

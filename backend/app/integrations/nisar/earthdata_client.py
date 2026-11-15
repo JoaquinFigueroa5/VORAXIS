@@ -40,24 +40,29 @@ class EarthdataClient:
             return False
         destination.parent.mkdir(parents=True, exist_ok=True)
         # Granules are several GB: write to a .part file so an interrupted
-        # download is never mistaken for a complete one.
+        # download is never mistaken for a complete one, and resume it when the
+        # link drops instead of starting the whole transfer again.
         partial = destination.with_name(destination.name + ".part")
-        try:
-            with session.get(url, stream=True, timeout=120) as response:
-                response.raise_for_status()
-                length = response.headers.get("Content-Length")
-                total = int(length) if length and length.isdigit() else None
-                done = reported = 0
-                with partial.open("wb") as handle:
-                    for chunk in response.iter_content(chunk_size=1024 * 1024):
-                        handle.write(chunk)
-                        done += len(chunk)
-                        if progress and done - reported >= 50 * 1024 * 1024:
-                            reported = done
-                            progress(done, total)
-                if progress:
-                    progress(done, total)
-            partial.replace(destination)
-        finally:
-            partial.unlink(missing_ok=True)
+        resume_from = partial.stat().st_size if partial.exists() else 0
+        headers = {"Range": f"bytes={resume_from}-"} if resume_from else {}
+        with session.get(url, stream=True, timeout=120, headers=headers) as response:
+            response.raise_for_status()
+            length = response.headers.get("Content-Length")
+            total = int(length) if length and length.isdigit() else None
+            resuming = bool(resume_from) and response.status_code == 206
+            if resuming and total:
+                total += resume_from  # Content-Length counts only what is left
+            else:
+                resume_from = 0  # no range support, or nothing to resume
+            done = reported = resume_from
+            with partial.open("ab" if resuming else "wb") as handle:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    handle.write(chunk)
+                    done += len(chunk)
+                    if progress and done - reported >= 50 * 1024 * 1024:
+                        reported = done
+                        progress(done, total)
+            if progress:
+                progress(done, total)
+        partial.replace(destination)
         return True

@@ -2,9 +2,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String, Uuid, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.nisar_scene import NisarScene
 
 STORAGE_STATUSES = ("DISCOVERED", "READY", "FAILED")
 
@@ -38,3 +39,27 @@ class Observation(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    # Joined so a list of observations carries its product metadata in one query.
+    scene: Mapped["NisarScene"] = relationship(lazy="joined")
+
+    @property
+    def product_type(self) -> str | None:
+        return self.scene.product_type if self.scene else None
+
+    @property
+    def maturity(self) -> str | None:
+        return self.scene.maturity if self.scene else None
+
+    @property
+    def orbit_direction(self) -> str | None:
+        return self.scene.orbit_direction if self.scene else None
+
+    @property
+    def polarization(self) -> list[str] | None:
+        return self.scene.polarization if self.scene else None
+
+    @property
+    def product_id(self) -> str | None:
+        return self.scene.product_id if self.scene else None
+

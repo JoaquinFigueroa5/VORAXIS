@@ -14,8 +14,16 @@ insights = InsightsService()
 
 
 @router.get("", response_model=list[JobOut])
-def list_jobs(db: DbSession, status: str | None = None, limit: Limit = 50, offset: Offset = 0):
-    return service.list(db, status=status, limit=limit, offset=offset)
+def list_jobs(
+    db: DbSession,
+    status: str | None = None,
+    location_id: uuid.UUID | None = None,
+    limit: Limit = 50,
+    offset: Offset = 0,
+):
+    return service.list(
+        db, status=status, location_id=location_id, limit=limit, offset=offset
+    )
 
 
 @router.get("/{job_id}", response_model=JobOut)

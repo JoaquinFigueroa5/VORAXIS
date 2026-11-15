@@ -46,8 +46,8 @@ frontend (React/Vite) ──REST/GeoJSON──► backend (FastAPI)
 - Re-muestreo/co-registro cuando los rasters no comparten grilla
   (`processing/alignment.py` falla con un mensaje claro).
 - Algoritmos para GUNW, GOFF y SME2.
-- Tiles XYZ (el endpoint responde `501`).
-- Ingesta de FIRMS y GPM.
+- Tiles XYZ raster y vectoriales: implementados (PNG por capa, MVT por análisis).
+- Ingesta de FIRMS y POWER: implementada como contexto auxiliar; ver `docs/data-sources.md`.
 
 ## Estados de un trabajo
 

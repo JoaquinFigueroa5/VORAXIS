@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { CloudRain, Flame, Activity, X } from "lucide-react";
+import { Link } from "react-router-dom";
 
-import { area, db, geometryBounds, number, shortDate, significance, signedDb, typeStyle, type Bounds } from "@/observatory/lib";
+import { area, db, geometryBounds, number, shortDate, signedDb, typeStyle, type Bounds } from "@/observatory/lib";
 import { changesService } from "@/services/changes.service";
 import { evidenceService } from "@/services/evidence.service";
 import type { EvidenceRecord } from "@/types/evidence";
@@ -117,6 +118,9 @@ export function ChangePanel({ changeId, onClose, onLocate }: ChangePanelProps) {
         <button className="btn tonal small" style={{ marginTop: 16 }} onClick={() => onLocate(geometryBounds(item.geometry))}>
           Centrar en el mapa
         </button>
+        <Link className="btn small" style={{ marginTop: 8 }} to={`/analisis/${item.job_id}/evidencia/${item.id}`}>
+          Explicar este cambio
+        </Link>
       </div>
 
       <div className="block">
@@ -145,8 +149,8 @@ export function ChangePanel({ changeId, onClose, onLocate }: ChangePanelProps) {
       <div className="block">
         <dl className="facts">
           <div>
-            <dt>Significancia</dt>
-            <dd>{significance(item.change_score, item.area_km2)}</dd>
+            <dt>Etiqueta</dt>
+            <dd>{item.change_type === "UNCLASSIFIED" ? "Sin clasificar" : "Hipótesis tentativa"}</dd>
           </div>
           <div>
             <dt>Intensidad relativa</dt>

@@ -38,6 +38,7 @@ class ChangeService:
             valid_pixel_percentage=change.valid_pixel_percentage,
             direction=change.direction,
             mean_change_db=change.mean_change_db,
+            classification=change.classification,
             created_at=change.created_at,
         )
 

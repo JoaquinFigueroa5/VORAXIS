@@ -41,6 +41,11 @@ export interface InsightsSummary {
   change_area_km2: number;
   evidence_records: number;
   auxiliary_events: number;
+  /** Distributions across every analysis. Empty until something has been detected. */
+  by_type: { change_type: string; label: string; count: number; area_km2: number }[];
+  by_direction: { direction: "DECREASE" | "INCREASE" | null; count: number; area_km2: number }[];
+  by_month: { month: string; count: number; area_km2: number }[];
+  by_location: { location_id: string; name: string; count: number; area_km2: number }[];
 }
 
 /** GET /jobs/{id}/insights: aggregates for the charts of one analysis. */
