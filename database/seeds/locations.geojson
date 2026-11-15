@@ -64,6 +64,26 @@
           ]
         ]
       }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Delta del Krishna",
+        "country": "India",
+        "description": "Krishna river delta and the Andhra Pradesh coast. Rectangular AOI for the October-November 2026 cyclone landfalls (ARNAB-26, MURASU-26); not an official boundary."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [80.0, 16.6],
+            [81.5, 16.6],
+            [81.5, 15.6],
+            [80.0, 15.6],
+            [80.0, 16.6]
+          ]
+        ]
+      }
     }
   ]
 }

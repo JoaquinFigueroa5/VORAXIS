@@ -20,7 +20,7 @@ export function AnalysisPanel({ locationId }: { locationId: string | null }) {
   const setBefore = useAnalysisStore((state) => state.setBefore);
   const setAfter = useAnalysisStore((state) => state.setAfter);
 
-  const [polarization, setPolarization] = useState("VV");
+  const [polarization, setPolarization] = useState("HH");
   const [minValid, setMinValid] = useState(80);
   const [sigma, setSigma] = useState(2);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -78,7 +78,7 @@ export function AnalysisPanel({ locationId }: { locationId: string | null }) {
           <label className="flex flex-col gap-1 text-xs text-muted">
             Polarización
             <Select value={polarization} onChange={(event) => setPolarization(event.target.value)}>
-              {["VV", "VH", "HH", "HV"].map((option) => (
+              {["HH", "HV", "VV", "VH"].map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>

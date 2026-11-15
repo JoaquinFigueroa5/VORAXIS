@@ -19,6 +19,7 @@ def main() -> None:
     parser.add_argument("--start", required=True, help="ISO date/time")
     parser.add_argument("--end", required=True, help="ISO date/time")
     parser.add_argument("--max-results", type=int, default=250)
+    parser.add_argument("--product-type", help="e.g. GCOV; default = every NISAR product")
     args = parser.parse_args()
 
     with SessionLocal() as db:
@@ -28,6 +29,7 @@ def main() -> None:
             start=parse_datetime(args.start),
             end=parse_datetime(args.end),
             max_results=args.max_results,
+            product_type=args.product_type,
         )
     print(f"synced {count} scenes")
 

@@ -51,7 +51,9 @@ def map_asf_product(product: dict[str, Any]) -> dict[str, Any] | None:
             "acquisition_start": start,
             "acquisition_end": _parse_datetime(product.get("stopTime")),
             "orbit_direction": product.get("flightDirection"),
-            "polarization": _polarizations(product.get("polarization")),
+            "polarization": _polarizations(
+                product.get("polarization") or product.get("mainBandPolarization")
+            ),
             "footprint_wkt": geojson_to_multipolygon_wkt(geometry),
             "metadata": json.loads(json.dumps(product, default=str)),
             "source_url": product.get("url"),

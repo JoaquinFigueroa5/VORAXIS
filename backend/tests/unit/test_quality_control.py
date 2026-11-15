@@ -53,3 +53,30 @@ def test_low_valid_percentage_stops_the_pipeline():
 
     with pytest.raises(ProcessingError, match="below the requested"):
         quality_control.run(None, context)
+
+
+def test_padding_outside_the_frame_does_not_count_against_the_pair():
+    """An AOI four times larger than the frame is still a perfectly good pair."""
+    array = np.ones((10, 10), dtype="float32")
+    outside = np.zeros((10, 10), dtype=bool)
+    outside[:, 5:] = True  # no data on either date: beyond the swath
+    outside[5:, :] = True
+    before, after = _raster(array, outside.copy()), _raster(array, outside.copy())
+
+    assert quality_control.valid_pixel_percentage(before, after) == pytest.approx(100.0)
+    assert quality_control.aoi_coverage_percentage(before, after) == pytest.approx(25.0)
+
+    context = _context(minimum=80.0)
+    context.before, context.after = before, after
+    quality_control.run(None, context)  # does not raise
+    assert context.aoi_coverage_percentage == pytest.approx(25.0)
+
+
+def test_a_pair_with_no_data_at_all_fails():
+    array = np.ones((4, 4), dtype="float32")
+    empty = np.ones((4, 4), dtype=bool)
+    context = _context(minimum=1.0)
+    context.before, context.after = _raster(array, empty), _raster(array, empty.copy())
+
+    with pytest.raises(ProcessingError, match="below the requested"):
+        quality_control.run(None, context)

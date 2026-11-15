@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from app.schemas.common import ORMModel
 
@@ -13,6 +14,8 @@ class JobOut(ORMModel):
     progress: int
     current_step: str | None = None
     error_message: str | None = None
+    parameters: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
     created_at: datetime

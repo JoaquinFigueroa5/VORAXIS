@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     minio_bucket: str = "spaceapps-data"
     minio_secure: bool = False
 
+    # Local cache for downloaded .h5 granules (relative to the backend workdir).
+    nisar_data_dir: str = "data/nisar"
+
+    # Local copies of COGs used to render map tiles; empty = system temp dir.
+    tile_cache_dir: str = ""
+
+    # Seconds a context lookup (ASF / USGS / POWER / FIRMS by point) is reused.
+    context_cache_ttl: int = 600
+
     earthdata_username: str = ""
     earthdata_password: str = ""
     firms_api_key: str = ""

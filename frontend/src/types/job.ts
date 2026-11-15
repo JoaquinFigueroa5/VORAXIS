@@ -19,6 +19,10 @@ export interface ProcessingJob {
   progress: number;
   current_step: JobStep | null;
   error_message: string | null;
+  /** Parameters the analysis was requested with */
+  parameters: Record<string, unknown> | null;
+  /** Threshold, counts per change_type and status of each auxiliary source */
+  result: Record<string, unknown> | null;
   started_at: string | null;
   finished_at: string | null;
   created_at: string;

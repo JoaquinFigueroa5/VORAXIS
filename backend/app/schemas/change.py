@@ -13,6 +13,8 @@ class ChangeEventOut(ORMModel):
     area_km2: float | None = None
     change_score: float | None = None
     valid_pixel_percentage: float | None = None
+    direction: str | None = None  # DECREASE | INCREASE
+    mean_change_db: float | None = None
     created_at: datetime
 
 
