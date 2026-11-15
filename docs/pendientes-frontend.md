@@ -49,7 +49,8 @@ Estilos en `frontend/src/assets/styles/globals.css`. Los servicios de la API est
 
 - [ ] **Gráficos con `GET /jobs/{id}/insights`**: histograma de score, histograma de área, cambios que se oscurecieron frente a los que se aclararon (`by_direction`) y resumen de evidencia. Recharts ya está instalado y `insightsService.forJob(id)` ya existe. Los campos están descritos en `docs/api.md`, sección "Insights de un análisis".
 - [ ] **Evidencia en el mapa**: dibujar los focos FIRMS y los sismos USGS como puntos sobre el comparador. Hoy solo aparecen en la tira inferior y en el panel de cada cambio. Datos: `/changes/{id}/evidence` o `/auxiliary/events?bbox=`.
-- [ ] **Filtros de cambios** por dirección (`DECREASE` / `INCREASE`), score mínimo y área mínima. `/changes` y `/changes/geojson` ya los aceptan (`direction`, `min_score`, `min_area_km2`). Los tiles vectoriales traen las mismas propiedades, así que se puede filtrar con `map.setFilter`.
+
+> **No es parte de esta tarea:** los filtros de cambios (área mínima, intensidad y dirección) los hace otra persona. El detalle está en [`docs/filtros-cambios.md`](filtros-cambios.md). Esa persona también toca `AnalysisPage.tsx` y `CompareMap.tsx`: coordinarse antes de cambiar la estructura de esos archivos.
 
 ### 2. Asistente de nuevo análisis
 
