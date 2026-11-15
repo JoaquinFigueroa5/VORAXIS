@@ -8,6 +8,7 @@ import { InsightsPage } from "@/observatory/InsightsPage";
 import { MethodologyPage } from "@/observatory/MethodologyPage";
 import { NewAnalysisPage } from "@/observatory/NewAnalysisPage";
 import { Shell } from "@/observatory/Shell";
+import { AboutPage } from "@/observatory/AboutPage";
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: "analisis/:id/evidencia/:changeId", element: <EvidencePage /> },
       { path: "insights", element: <InsightsPage /> },
       { path: "metodologia", element: <MethodologyPage /> },
+      { path: "quienes-somos", element: <AboutPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
