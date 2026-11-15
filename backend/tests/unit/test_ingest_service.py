@@ -266,3 +266,78 @@ def test_product_missing_from_the_catalogue_is_fetched_from_asf(service, tmp_pat
     scene = service.scenes.by_product[name]
     assert scene.product_type == "GCOV" and scene.source_url.endswith(".h5")
     assert scene.polarization == ["HH", "HV"]
+
+
+class CopyEarthdata:
+    """Stands in for NASA: 'downloads' a local granule into the cache folder."""
+
+    def __init__(self, source):
+        self.source = source
+        self.calls = 0
+
+    def download(self, _url, destination, progress=None):
+        self.calls += 1
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(self.source.read_bytes())
+        return True
+
+
+@pytest.fixture()
+def downloading(service, granule, tmp_path, monkeypatch):
+    """A catalogued scene whose granule arrives through the Earthdata client."""
+    cache = tmp_path / "cache"
+    monkeypatch.setattr("app.services.ingest_service.settings.nisar_data_dir", str(cache))
+    service.earthdata = CopyEarthdata(granule)
+    db = FakeDb()
+    scene = service.scenes.upsert(
+        db,
+        product_id=granule.stem,
+        product_type="GCOV",
+        source_url=f"https://example.invalid/{granule.name}",
+        acquisition_start=START,
+    )
+    return db, scene, cache / granule.name
+
+
+def test_downloaded_granule_is_deleted_once_stored(service, downloading, monkeypatch):
+    monkeypatch.setattr("app.services.ingest_service.settings.keep_downloaded_granules", False)
+    db, scene, cached = downloading
+
+    result = service.ingest(db, location_name="Petén", product_id=scene.product_id)
+
+    assert not result.skipped and service.storage.uploads
+    assert not cached.exists()
+
+
+def test_downloaded_granule_is_kept_when_configured(service, downloading, monkeypatch):
+    monkeypatch.setattr("app.services.ingest_service.settings.keep_downloaded_granules", True)
+    db, scene, cached = downloading
+
+    service.ingest(db, location_name="Petén", product_id=scene.product_id)
+
+    assert cached.exists()
+
+
+def test_a_file_the_caller_passed_is_never_deleted(service, granule, monkeypatch):
+    monkeypatch.setattr("app.services.ingest_service.settings.keep_downloaded_granules", False)
+
+    service.ingest(FakeDb(), location_name="Petén", h5_path=granule)
+
+    assert granule.exists()
+
+
+def test_an_ingested_product_is_skipped_without_downloading_again(service, downloading, monkeypatch):
+    monkeypatch.setattr("app.services.ingest_service.settings.keep_downloaded_granules", False)
+    db, scene, _cached = downloading
+    first = service.ingest(db, location_name="Petén", product_id=scene.product_id)
+    stages = []
+
+    again = service.ingest(
+        db,
+        location_name="Petén",
+        product_id=scene.product_id,
+        on_progress=lambda stage, detail=None: stages.append(stage),
+    )
+
+    assert again.skipped and again.observation_id == first.observation_id
+    assert service.earthdata.calls == 1 and stages == ["READY"]

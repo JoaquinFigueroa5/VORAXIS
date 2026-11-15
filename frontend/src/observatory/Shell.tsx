@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { DownloadsMenu } from "@/observatory/DownloadsMenu";
+import { API_ORIGIN } from "@/observatory/lib";
 
 /** Two radar passes and the line you drag between them. */
 function Mark() {
@@ -73,7 +74,7 @@ export function Shell() {
                     <Link to="/nuevo">Nuevo análisis</Link>
                   </li>
                   <li>
-                    <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">
+                    <a href={`${API_ORIGIN}/docs`} target="_blank" rel="noreferrer">
                       Documentación de la API
                     </a>
                   </li>

@@ -131,6 +131,15 @@ class IngestService:
                 f"scene {scene.product_id} is {scene.product_type}; only GCOV ingestion exists"
             )
 
+        # Already ingested for this zone: answer before downloading gigabytes again.
+        if scene is not None and not force:
+            done = self._ready_source(db, scene, location.id)
+            if done is not None:
+                logger.info("observation %s already ingested; skipping", done[0].id)
+                report("READY")
+                return self._skipped(scene, *done)
+
+        downloaded = h5_path is None
         path = Path(h5_path) if h5_path else self._download(scene, report)
         info = inspect_gcov(path, frequency=frequency)
         declared = info.identification.get("productType")
@@ -145,17 +154,9 @@ class IngestService:
         existing = self.rasters.source_for_observation(db, observation.id)
         if existing is not None and observation.storage_status == "READY" and not force:
             logger.info("observation %s already ingested; skipping", observation.id)
+            self._discard(path, downloaded)
             report("READY")
-            return IngestResult(
-                observation_id=observation.id,
-                scene_id=scene.id,
-                asset_id=existing.id,
-                product_id=scene.product_id,
-                storage_path=existing.storage_path,
-                crs=existing.crs,
-                skipped=True,
-                bands=(existing.extra_metadata or {}).get("bands", []),
-            )
+            return self._skipped(scene, observation, existing)
 
         key = f"sources/{observation.id}/{scene.product_id}.tif"
         try:
@@ -215,6 +216,7 @@ class IngestService:
             raise
 
         logger.info("ingested %s for %s -> %s", scene.product_id, location.name, key)
+        self._discard(path, downloaded)
         report("READY")
         return IngestResult(
             observation_id=observation.id,
@@ -225,6 +227,45 @@ class IngestService:
             crs=cog.crs,
             bands=cog.bands,
         )
+
+    def _ready_source(self, db, scene: NisarScene, location_id):
+        """(observation, SOURCE asset) when this scene is already READY for the zone."""
+        found = self.observations.list(db, scene_id=scene.id, location_id=location_id, limit=1)
+        if not found or found[0].storage_status != "READY":
+            return None
+        asset = self.rasters.source_for_observation(db, found[0].id)
+        return (found[0], asset) if asset is not None else None
+
+    @staticmethod
+    def _skipped(scene: NisarScene, observation, asset) -> IngestResult:
+        return IngestResult(
+            observation_id=observation.id,
+            scene_id=scene.id,
+            asset_id=asset.id,
+            product_id=scene.product_id,
+            storage_path=asset.storage_path,
+            crs=asset.crs,
+            skipped=True,
+            bands=(asset.extra_metadata or {}).get("bands", []),
+        )
+
+    @staticmethod
+    def _discard(path: Path, downloaded: bool) -> None:
+        """Drop a granule this run downloaded once its COG is stored, unless told to keep it.
+
+        Only files fetched into `nisar_data_dir` go: a path the caller passed is theirs.
+        A failed run keeps the file so a retry does not download it again.
+        """
+        if not downloaded or settings.keep_downloaded_granules:
+            return
+        try:
+            size_gb = path.stat().st_size / 1e9
+            path.unlink()
+            logger.info("deleted %s (%.2f GB) after ingestion", path.name, size_gb)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            logger.warning("could not delete %s", path, exc_info=True)
 
     def _location(self, db, location_id, location_name) -> tuple[Any, BaseGeometry]:
         if location_id is None and location_name:

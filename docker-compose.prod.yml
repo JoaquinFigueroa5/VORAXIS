@@ -1,0 +1,149 @@
+# Voraxis in production: one VM, everything behind Caddy (HTTPS on 80/443).
+#
+#   cp deploy/env.prod.example .env      # then fill it in (never commit it)
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Sized for an Azure B2ms (2 vCPU, 8 GB) with 4 GB of swap. Only Caddy publishes
+# ports; the database, Redis, the S3 store and the API are reachable only inside
+# the compose network. Service names match docker-compose.yml so the same
+# DATABASE_URL / REDIS_URL / MINIO_ENDPOINT values work in both.
+# See docs/despliegue.md.
+
+name: voraxis
+
+x-backend: &backend
+  build: ./backend
+  env_file:
+    - .env
+  environment:
+    CORS_ORIGINS: ${PUBLIC_URL:?set PUBLIC_URL in .env}
+    # The server's disk is small: drop each .h5 (2-7 GB) once its COG is stored.
+    KEEP_DOWNLOADED_GRANULES: ${KEEP_DOWNLOADED_GRANULES:-false}
+    NISAR_DATA_DIR: /app/data/nisar
+    TILE_CACHE_DIR: /cache/tiles
+  restart: unless-stopped
+
+services:
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}/api/v1
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    mem_limit: 256m
+    restart: unless-stopped
+
+  # Brings the schema up to date, then exits; the API waits for it.
+  migrate:
+    <<: *backend
+    command: alembic upgrade head
+    restart: "no"
+    depends_on:
+      database:
+        condition: service_healthy
+
+  backend:
+    <<: *backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=*
+    volumes:
+      - nisar_data:/app/data/nisar
+      - tile_cache:/cache/tiles
+      - ./database:/database:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    mem_limit: 2g
+
+  # Downloads, HDF5 -> COG conversion and analyses, one at a time.
+  worker:
+    <<: *backend
+    command: python -m app.workers.worker
+    volumes:
+      - nisar_data:/app/data/nisar
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    mem_limit: 4g
+
+  database:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ${DB_NAME:-spaceapps}
+      POSTGRES_USER: ${DB_USER:-spaceapps}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-spaceapps} -d ${DB_NAME:-spaceapps}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 1g
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "300", "1", "--maxmemory", "200mb"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 256m
+    restart: unless-stopped
+
+  # S3 API over the VM disk (VersityGW). Named "minio" for the app's MINIO_* settings.
+  minio:
+    image: versity/versitygw:v1.11.0
+    command: ["--port", ":9000", "posix", "/data"]
+    environment:
+      ROOT_ACCESS_KEY: ${MINIO_USER:?set MINIO_USER in .env}
+      ROOT_SECRET_KEY: ${MINIO_PASSWORD:?set MINIO_PASSWORD in .env}
+    volumes:
+      - objects:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:9000/ 2>&1 | grep -q 403"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 768m
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  objects:
+  redis_data:
+  nisar_data:
+  tile_cache:
+  caddy_data:
+  caddy_config:

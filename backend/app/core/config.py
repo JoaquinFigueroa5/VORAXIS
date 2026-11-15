@@ -33,6 +33,10 @@ class Settings(BaseSettings):
 
     # Local cache for downloaded .h5 granules (relative to the backend workdir).
     nisar_data_dir: str = "data/nisar"
+    # Keep downloaded .h5 granules after they are converted to a COG. They are
+    # 2-7 GB each and only needed again to re-ingest with other options, so a
+    # server with a small disk sets this to false.
+    keep_downloaded_granules: bool = True
 
     # Local copies of COGs used to render map tiles; empty = system temp dir.
     tile_cache_dir: str = ""

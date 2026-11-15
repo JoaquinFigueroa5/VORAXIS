@@ -41,3 +41,6 @@ Thumbs.db
 frontend/.taste-skill/chrome-*/
 frontend/.taste-skill/gate/
 frontend/shots/
+
+# deploy/backup.sh output
+backups/
