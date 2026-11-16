@@ -1,6 +1,8 @@
 # One entry point for Voraxis: the built frontend at /, the API under /api.
 # SITE_ADDRESS is the public domain (Caddy gets the HTTPS certificate by itself),
 # or ":80" to serve plain HTTP when testing locally.
+# REDIRECT_HOSTS lists other names (www, the Azure address) that send visitors to
+# PUBLIC_URL; the frontend calls the API on PUBLIC_URL only, so one name must win.
 
 {$SITE_ADDRESS} {
 	encode zstd gzip
@@ -28,4 +30,8 @@
 		Referrer-Policy strict-origin-when-cross-origin
 		-Server
 	}
+}
+
+{$REDIRECT_HOSTS} {
+	redir {$PUBLIC_URL}{uri} permanent
 }
