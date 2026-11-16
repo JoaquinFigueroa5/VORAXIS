@@ -66,6 +66,9 @@ export function Shell() {
             <NavLink to="/metodologia" className={link}>
               Metodología
             </NavLink>
+              <NavLink to="/quienes-somos" className={link}>
+                Quiénes somos
+              </NavLink>
           </nav>
           <ModeSwitch />
           <DownloadsMenu />
@@ -99,6 +102,9 @@ export function Shell() {
                   </li>
                   <li>
                     <Link to="/metodologia">Metodología y fuentes</Link>
+                  </li>
+                  <li>
+                    <Link to="/quienes-somos">Quiénes somos</Link>
                   </li>
                 </ul>
               </div>
