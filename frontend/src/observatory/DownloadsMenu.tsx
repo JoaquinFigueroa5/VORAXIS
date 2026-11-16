@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   STAGE,
   acquisitionDate,
+  downloadedText,
   failureText,
   groupBatches,
   jobForPair,
@@ -177,7 +178,7 @@ function BatchRow({ batch, jobs, onDone }: { batch: Batch; jobs: ProcessingJob[]
                 <span>{batch.tasks.length === 2 ? (index === 0 ? "Antes" : "Después") : "Imagen"}</span>
                 <span className="quiet">
                   {task.status === "FAILED" ? "Falló" : STAGE[task.stage ?? "QUEUED"]}
-                  {task.status !== "COMPLETED" && task.detail ? `, ${task.detail}` : ""}
+                  {task.status !== "COMPLETED" && downloadedText(task) ? `, ${downloadedText(task)}` : ""}
                 </span>
               </div>
               <div className="bar" data-failed={task.status === "FAILED" || undefined}>

@@ -21,7 +21,9 @@ export interface IngestTask {
   /** 0-100 */
   progress: number;
   /** e.g. "1.80 GB de 4.89 GB" while downloading */
-  detail: string | null;
+  /** Download progress; the client writes "2,31 de 6,85 GB" */
+  bytes_done: number | null;
+  bytes_total: number | null;
   /** Present when COMPLETED; `observation_id` is what POST /analysis needs */
   result: {
     observation_id: string;

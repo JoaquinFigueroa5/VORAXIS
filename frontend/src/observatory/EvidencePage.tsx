@@ -3,6 +3,7 @@ import { Activity, CloudRain, Flame, Satellite } from "lucide-react";
 import type { JSX } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { coded, sourceName } from "@/i18n";
 import { area, db, number, shortDate, signedDb, typeStyle } from "@/observatory/lib";
 import { interpretationService } from "@/services/interpretation.service";
 import { useInterface } from "@/stores/interface";
@@ -140,7 +141,7 @@ export function EvidencePage() {
           {item.classification.reasons.length > 0 ? (
             <ul className="steps-list" style={{ marginTop: 14 }}>
               {item.classification.reasons.map((reason, index) => (
-                <li key={index}>{reason}</li>
+                <li key={index}>{coded("reason", reason, "")}</li>
               ))}
             </ul>
           ) : (
@@ -159,14 +160,15 @@ export function EvidencePage() {
                   {SOURCE_GLYPH[name] ?? <Activity size={16} />}
                 </span>
                 <div>
-                  <p style={{ fontWeight: 500 }}>{name}</p>
+                  <p style={{ fontWeight: 500 }}>{sourceName(name)}</p>
                   <p className="label">{SOURCE_STATE[state.status]}</p>
                   {state.status === "AVAILABLE" && state.events_found != null ? (
                     <p className="quiet">
                       {number(state.events_found, 0)} {state.events_found === 1 ? "evento" : "eventos"} en la ventana
                     </p>
                   ) : null}
-                  {state.detail ? <p className="quiet">{state.detail}</p> : null}
+                  {state.code ? <p className="quiet">{coded("limitation", { code: state.code, params: { source: name } })}</p> : null}
+                  {scientific && state.detail ? <p className="quiet num">{state.detail}</p> : null}
                 </div>
               </div>
             ))}
@@ -289,7 +291,7 @@ export function EvidencePage() {
           <h2 id="limites">Limitaciones de esta interpretación</h2>
           <ul className="steps-list">
             {item.limitations.map((limitation, index) => (
-              <li key={index}>{limitation}</li>
+              <li key={index}>{coded("limitation", limitation)}</li>
             ))}
           </ul>
           <p style={{ marginTop: 20, display: "flex", gap: 8, flexWrap: "wrap" }}>

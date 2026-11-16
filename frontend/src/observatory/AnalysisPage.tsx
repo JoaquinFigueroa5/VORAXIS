@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { coded, t } from "@/i18n";
 import { ChangePanel } from "@/observatory/ChangePanel";
 import { CompareMap, type ViewMode } from "@/observatory/CompareMap";
 import { IntervalStrip } from "@/observatory/IntervalStrip";
@@ -33,6 +34,12 @@ const STEP_LABELS: Record<string, string> = {
   EVIDENCE_ANALYSIS: "Buscando sismos, incendios y lluvia",
   EXPORTING: "Guardando los mapas",
 };
+
+/** Known failures come as a code (`cancelled_by_user`); anything else is the worker's own message. */
+function jobError(message: string | null): string {
+  if (!message) return t("job.error.generic");
+  return /^[a-z_]+$/.test(message) ? t(`job.error.${message}`, null, t("job.error.generic")) : message;
+}
 
 export function AnalysisPage() {
   const { id = "" } = useParams();
@@ -137,7 +144,7 @@ export function AnalysisPage() {
           </h1>
           {failed ? (
             <p className="notice problem" style={{ marginTop: "1rem" }}>
-              {job.data.error_message ?? "El análisis se detuvo sin dar un motivo."}
+              {jobError(job.data.error_message)}
             </p>
           ) : (
             <>
@@ -347,9 +354,9 @@ export function AnalysisPage() {
                   {info.status === "skipped" ? "falta configurar la clave de acceso." : "la fuente no respondió."}
                 </p>
               ))}
-              {warnings.length > 0 ? (
-                <p className="notice">Las dos imágenes se procesaron con versiones distintas del software de NASA; puede haber un pequeño desfase general entre ellas.</p>
-              ) : null}
+              {warnings.map((warning, index) => (
+                <p key={index} className="notice">{coded("job.warning", warning)}</p>
+              ))}
             </div>
           </div>
         ) : null}

@@ -1,3 +1,4 @@
+import type { Coded } from "@/i18n";
 import type { ChangeDirection } from "@/types/change";
 import type { EvidenceRecord } from "@/types/evidence";
 
@@ -21,17 +22,17 @@ export interface Interpretation {
   };
   change: {
     change_type: string;
-    label: string;
     area_km2: number | null;
     change_score: number | null;
     valid_pixel_percentage: number | null;
     direction: ChangeDirection | null;
     mean_change_db: number | null;
   };
-  classification: { confidence: "NONE" | "LOW" | "MEDIUM" | null; reasons: string[] };
-  metrics: { name: string; label: string; value: number | null; unit: string | null }[];
+  classification: { confidence: "NONE" | "LOW" | "MEDIUM" | null; reasons: Coded[] };
+  metrics: { name: string; value: number | null; unit: string | null }[];
   evidence: EvidenceRecord[];
   /** NISAR first, then whichever auxiliary sources the job tried */
-  sources: Record<string, { status: SourceStatus; events_found: number | null; detail: string | null }>;
-  limitations: string[];
+  sources: Record<string, { status: SourceStatus; events_found: number | null; detail: string | null; code: string | null }>;
+  /** `limitation.<code>` in the dictionaries */
+  limitations: Coded[];
 }

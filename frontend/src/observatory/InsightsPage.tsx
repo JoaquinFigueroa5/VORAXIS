@@ -130,7 +130,7 @@ export function InsightsPage() {
               <Bars
                 rows={data.by_type.map((row) => ({
                   key: row.change_type,
-                  label: row.label,
+                  label: typeStyle(row.change_type).label,
                   value: row.count,
                   note: `${number(row.count, 0)} · ${area(row.area_km2)}`,
                   color: typeStyle(row.change_type).color,

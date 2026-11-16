@@ -18,9 +18,6 @@ export function EvidenceCard({ record }: { record: EvidenceRecord }) {
           : "tiempo —"}{" "}
         · score {formatNumber(record.evidence_score, 3)}
       </p>
-      {record.explanation ? (
-        <p className="text-xs leading-relaxed text-slate-300">{record.explanation}</p>
-      ) : null}
     </li>
   );
 }

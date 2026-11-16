@@ -4,7 +4,7 @@ import { Map as MapLibreMap, NavigationControl, type GeoJSONSource } from "@/obs
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { DEFAULT_MULTILOOK, STAGE, failureText, jobForPair, launchAnalysis, useIngestTasks, useJobs } from "@/observatory/downloads";
+import { DEFAULT_MULTILOOK, STAGE, downloadedText, failureText, jobForPair, launchAnalysis, useIngestTasks, useJobs } from "@/observatory/downloads";
 import { boundsCenter, geometryBounds, number, shortDate } from "@/observatory/lib";
 import { ApiError } from "@/services/api";
 import { contextService } from "@/services/context.service";
@@ -311,7 +311,7 @@ export function NewAnalysisPage() {
                   <span>{index === 0 ? "Imagen de antes" : "Imagen de después"}</span>
                   <span className="quiet">
                     {task.status === "FAILED" ? "Falló" : STAGE[task.stage ?? "QUEUED"]}
-                    {task.detail ? `, ${task.detail}` : ""}
+                    {downloadedText(task) ? `, ${downloadedText(task)}` : ""}
                   </span>
                 </div>
                 <div className="bar"><i style={{ transform: `scaleX(${task.progress / 100})` }} /></div>

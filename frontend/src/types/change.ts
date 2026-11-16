@@ -1,3 +1,4 @@
+import type { Coded } from "@/i18n";
 import type { FeatureCollection, MultiPolygon } from "geojson";
 
 export type ChangeDirection = "DECREASE" | "INCREASE";
@@ -21,9 +22,9 @@ export interface ChangeEvent {
 
 export interface ChangeClassification {
   type: string;
-  label?: string | null;
   confidence: "NONE" | "LOW" | "MEDIUM" | null;
-  reasons: string[];
+  /** `reason.<code>` in the dictionaries */
+  reasons: Coded[];
 }
 
 export interface ChangeMetric {

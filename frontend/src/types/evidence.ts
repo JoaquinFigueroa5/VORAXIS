@@ -21,7 +21,6 @@ export interface EvidenceRecord {
   distance_km: number | null;
   time_difference_hours: number | null;
   evidence_score: number | null;
-  explanation: string | null;
   created_at: string;
   event: AuxiliaryEvent | null;
 }

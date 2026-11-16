@@ -1,3 +1,4 @@
+import type { Coded } from "@/i18n";
 import { z } from "zod";
 
 export const analysisParametersSchema = z.object({
@@ -27,9 +28,8 @@ export interface AnalysisAccepted {
   job_id: string;
   status: string;
   progress: number;
-  message: string;
-  /** The pair is usable, but the user should see these (e.g. different processing versions) */
-  warnings: string[];
+  /** The pair is usable, but the user should see these (`job.warning.<code>`) */
+  warnings: Coded[];
 }
 
 export interface InsightsSummary {
@@ -42,7 +42,7 @@ export interface InsightsSummary {
   evidence_records: number;
   auxiliary_events: number;
   /** Distributions across every analysis. Empty until something has been detected. */
-  by_type: { change_type: string; label: string; count: number; area_km2: number }[];
+  by_type: { change_type: string; count: number; area_km2: number }[];
   by_direction: { direction: "DECREASE" | "INCREASE" | null; count: number; area_km2: number }[];
   by_month: { month: string; count: number; area_km2: number }[];
   by_location: { location_id: string; name: string; count: number; area_km2: number }[];
@@ -67,7 +67,6 @@ export interface JobInsights {
   };
   by_type: {
     change_type: string;
-    label: string;
     count: number;
     area_km2: number;
     mean_score: number | null;
@@ -94,5 +93,5 @@ export interface JobInsights {
     series: { date: string; mm: number | null }[];
   }[];
   sources: Record<string, { status: "ok" | "skipped" | "error"; events_found?: number; detail?: string }>;
-  warnings: string[];
+  warnings: Coded[];
 }

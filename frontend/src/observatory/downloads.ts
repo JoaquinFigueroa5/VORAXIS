@@ -8,6 +8,8 @@
  */
 import { useQuery } from "@tanstack/react-query";
 
+import { t } from "@/i18n";
+import { number } from "@/observatory/lib";
 import { analysisService } from "@/services/analysis.service";
 import { ingestService } from "@/services/ingest.service";
 import { jobsService } from "@/services/jobs.service";
@@ -149,6 +151,16 @@ export function launchAnalysis(locationId: string, pair: NonNullable<Batch["pair
     analysis_type: "GCOV_CHANGE",
     parameters: DEFAULT_ANALYSIS,
   });
+}
+
+const GB = 1024 ** 3;
+
+/** "2,31 de 6,85 GB" while downloading; empty when the worker reports no byte counts. */
+export function downloadedText(task: IngestTask): string {
+  if (task.bytes_done == null) return "";
+  const done = number(task.bytes_done / GB, 2);
+  if (!task.bytes_total) return t("ingest.downloaded_partial", { done });
+  return t("ingest.downloaded", { done, total: number(task.bytes_total / GB, 2) });
 }
 
 /** The worker reports Python exceptions; say what happened in words and keep the original for the tooltip. */

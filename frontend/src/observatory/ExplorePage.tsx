@@ -40,10 +40,8 @@ function coords(lat: number, lon: number): string {
 }
 
 function problem(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.message.includes("FIRMS_API_KEY")) return "Falta configurar la clave de NASA FIRMS en el backend.";
-    return `La fuente no respondió: ${error.message}`;
-  }
+  // The API already words it ("NASA FIRMS no respondió.", "Falta configurar…").
+  if (error instanceof ApiError) return error.message;
   return "La fuente no respondió. Vuelve a intentarlo en un momento.";
 }
 
