@@ -11,7 +11,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
-from app.evidence.classification import LABELS_ES, UNCLASSIFIED
+from app.evidence.classification import UNCLASSIFIED
 from app.models.location import Location
 from app.models.observation import Observation
 from app.models.processing_job import ProcessingJob
@@ -19,44 +19,23 @@ from app.repositories.observation_repository import ObservationRepository
 from app.services.change_service import ChangeService
 from app.services.evidence_service import EvidenceService
 
-SOURCE_LABELS = {
-    "NISAR": "NISAR · radar de apertura sintética",
-    "USGS": "USGS · catálogo sísmico",
-    "FIRMS": "NASA FIRMS · focos de calor",
-    "POWER": "NASA POWER · precipitación",
-}
-
-# Metric name -> (label, unit) the client shows without knowing the pipeline.
-METRIC_LABELS = {
-    "mean_change_db": ("Cambio medio de retrodispersión", "dB"),
-    "mean_backscatter_before_db": ("Retrodispersión antes", "dB"),
-    "mean_backscatter_after_db": ("Retrodispersión después", "dB"),
-    "peak_change_db": ("Cambio máximo", "dB"),
-    "scene_baseline_shift_db": ("Desplazamiento de la línea base", "dB"),
-    "detection_threshold_db": ("Umbral de detección", "dB"),
-    "mean_absolute_difference": ("Diferencia media (amplitud)", "amplitud"),
-    "std_absolute_difference": ("Desviación de la diferencia", "amplitud"),
-    "changed_area_km2": ("Área modificada", "km²"),
-    "changed_pixel_fraction": ("Fracción de píxeles modificados", "fracción"),
-    "valid_pixel_percentage": ("Píxeles válidos", "%"),
-    "changed_pixel_count": ("Píxeles modificados", "píxeles"),
-    "job_changed_pixel_fraction": ("Fracción de píxeles modificados", "fracción"),
-    "job_valid_pixel_percentage": ("Píxeles válidos del trabajo", "%"),
-    "threshold_sigma": ("Umbral de detección", "σ"),
-}
-
 
 def _source_state(report: dict[str, Any] | None) -> dict[str, Any]:
     """`job.result.evidence_sources` as the three states the interface draws."""
     if not report:
         return {}
     status = report.get("status")
+    state = {"ok": "AVAILABLE", "error": "UNAVAILABLE", "skipped": "NOT_CONFIGURED"}.get(
+        status, "UNAVAILABLE"
+    )
     return {
-        "status": {"ok": "AVAILABLE", "error": "UNAVAILABLE", "skipped": "NOT_CONFIGURED"}.get(
-            status, "UNAVAILABLE"
-        ),
+        "status": state,
         "events_found": report.get("events_found"),
         "detail": report.get("detail"),
+        "code": {
+            "UNAVAILABLE": "source.unavailable",
+            "NOT_CONFIGURED": "source.not_configured",
+        }.get(state),
     }
 
 
@@ -85,29 +64,27 @@ class InterpretationService:
         reasons = classification.get("reasons") or []
         evidence = self.evidence.for_change(db, change_id)
 
-        sources = {"NISAR": {"status": "AVAILABLE", "events_found": None, "detail": None}}
+        sources = {
+            "NISAR": {
+                "status": "AVAILABLE",
+                "events_found": None,
+                "detail": None,
+                "code": None,
+            }
+        }
         for name, report in ((job.result or {}).get("evidence_sources") or {}).items():
             sources[name] = _source_state(report)
 
-        limitations = [
-            "La clasificación es tentativa: `POSSIBLE_*` es una hipótesis compatible con la "
-            "señal, no un diagnóstico confirmado.",
-            "Coincidir en el espacio y en el tiempo no demuestra causalidad.",
-        ]
+        limitations = [{"code": "tentative"}, {"code": "causality"}]
         if change.change_score is not None:
-            limitations.append(
-                "El change_score mide la intensidad relativa del cambio en la señal, "
-                "no es una probabilidad calibrada."
-            )
+            limitations.append({"code": "score_not_probability"})
         for name, state in sources.items():
             if state["status"] == "UNAVAILABLE":
-                limitations.append(f"No se pudo consultar {SOURCE_LABELS.get(name, name)}.")
+                limitations.append({"code": "source.unavailable", "params": {"source": name}})
             elif state["status"] == "NOT_CONFIGURED":
-                limitations.append(
-                    f"{SOURCE_LABELS.get(name, name)} no está configurado: ese contexto falta."
-                )
+                limitations.append({"code": "source.not_configured", "params": {"source": name}})
         if before and after and after.acquisition_date == before.acquisition_date:
-            limitations.append("Las dos adquisiciones tienen la misma fecha: no hay intervalo.")
+            limitations.append({"code": "same_date"})
 
         missing = [name for name, state in sources.items() if state["status"] != "AVAILABLE"]
         complete = not missing and change.change_type != UNCLASSIFIED
@@ -140,7 +117,6 @@ class InterpretationService:
             },
             "change": {
                 "change_type": change.change_type,
-                "label": LABELS_ES.get(change.change_type, change.change_type),
                 "area_km2": change.area_km2,
                 "change_score": change.change_score,
                 "valid_pixel_percentage": change.valid_pixel_percentage,
@@ -154,7 +130,6 @@ class InterpretationService:
             "metrics": [
                 {
                     "name": metric.metric_name,
-                    "label": METRIC_LABELS.get(metric.metric_name, (metric.metric_name, metric.unit))[0],
                     "value": metric.value,
                     "unit": metric.unit,
                 }

@@ -68,7 +68,7 @@ def run(job_id: str, parameters: dict | None = None) -> None:
         before = ObservationRepository().get(db, job.before_observation_id)
         after = ObservationRepository().get(db, job.after_observation_id)
         if location is None or before is None or after is None:
-            _update(db, jobs, job, status="FAILED", error_message="job references missing rows")
+            _update(db, jobs, job, status="FAILED", error_message="job_missing_rows")
             return
 
         before_scene = db.get(NisarScene, before.scene_id)
@@ -125,7 +125,7 @@ def run(job_id: str, parameters: dict | None = None) -> None:
                 jobs,
                 job,
                 status="FAILED",
-                error_message=f"not implemented: {exc}",
+                error_message="not_implemented",
                 finished_at=datetime.now(UTC),
             )
             raise

@@ -60,7 +60,8 @@ def to_out(job: Job) -> IngestTaskOut:
         status=status,
         stage=stage,
         progress=progress,
-        detail=meta.get("detail"),
+        bytes_done=meta.get("bytes_done"),
+        bytes_total=meta.get("bytes_total"),
         result=result if isinstance(result, dict) else None,
         error=_last_line(job.exc_info) if status == "FAILED" else None,
         enqueued_at=job.enqueued_at,
@@ -82,16 +83,23 @@ class IngestTaskService:
         for product_id in product_ids:
             name = parse_product_name(product_id)
             if name is None:
-                raise AppError(f"'{product_id}' is not a NISAR granule name")
+                raise AppError(
+                    f"'{product_id}' is not a NISAR granule name",
+                    code="not_a_granule",
+                    params={"product_id": product_id},
+                )
             if name.product_type != "GCOV":
                 raise AppError(
-                    f"{product_id} is a {name.product_type} product; only GCOV can be ingested"
+                    f"{product_id} is a {name.product_type} product; only GCOV can be ingested",
+                    code="not_gcov",
+                    params={"product_id": product_id, "product_type": name.product_type},
                 )
             cached = Path(settings.nisar_data_dir) / f"{product_id}.h5"
             if not cached.is_file() and not self.earthdata.configured:
                 raise AppError(
                     "downloads need Earthdata credentials: set EARTHDATA_USERNAME and "
-                    "EARTHDATA_PASSWORD in .env"
+                    "EARTHDATA_PASSWORD in .env",
+                    code="earthdata_not_configured",
                 )
 
         tasks = []
@@ -106,7 +114,7 @@ class IngestTaskService:
                 )
             except Exception as exc:
                 logger.exception("could not enqueue ingestion of %s", product_id)
-                raise AppError("ingestion queue is unavailable") from exc
+                raise AppError("ingestion queue is unavailable", code="queue_unavailable") from exc
             tasks.append(self.get(job_id))
         return tasks
 

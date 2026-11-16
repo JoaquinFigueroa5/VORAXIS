@@ -26,7 +26,9 @@ class IngestTaskOut(BaseModel):
     status: str  # QUEUED | RUNNING | COMPLETED | FAILED
     stage: str | None = None  # QUEUED | DOWNLOADING | CONVERTING | UPLOADING | READY
     progress: int = 0  # 0-100
-    detail: str | None = None
+    # Download progress in bytes; the client formats "2.31 of 6.85 GB" in its language.
+    bytes_done: int | None = None
+    bytes_total: int | None = None
     # When COMPLETED: observation_id, scene_id, asset_id, storage_path, bands...
     result: dict[str, Any] | None = None
     error: str | None = None

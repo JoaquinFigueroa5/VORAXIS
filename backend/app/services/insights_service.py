@@ -3,7 +3,7 @@ from typing import Any
 from sqlalchemy import case, func, select
 
 from app.core.exceptions import NotFoundError
-from app.evidence.classification import LABELS_ES
+from app.core.exceptions import NotFoundError
 from app.models.auxiliary_event import AuxiliaryEvent
 from app.models.change_event import ChangeEvent
 from app.models.evidence_record import EvidenceRecord
@@ -29,7 +29,6 @@ class InsightsService:
         by_type = [
             {
                 "change_type": change_type,
-                "label": LABELS_ES.get(change_type, change_type),
                 "count": count,
                 "area_km2": round(total or 0.0, 3),
             }
@@ -108,7 +107,6 @@ class InsightsService:
         by_type = [
             {
                 "change_type": change_type,
-                "label": LABELS_ES.get(change_type, change_type),
                 "count": count,
                 "area_km2": round(float(total), 3),
                 "mean_score": None if score is None else round(float(score), 3),

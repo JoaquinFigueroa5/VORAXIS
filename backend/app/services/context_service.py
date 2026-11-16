@@ -199,7 +199,11 @@ class ContextService:
             raise
         except (httpx.HTTPError, Exception) as exc:  # network, quota, upstream format
             logger.warning("%s lookup failed: %s", kind, exc)
-            raise UpstreamError(f"{kind} source did not answer: {str(exc)[:200]}") from exc
+            raise UpstreamError(
+                f"{kind} source did not answer: {str(exc)[:200]}",
+                code="upstream_unavailable",
+                params={"source": kind},
+            ) from exc
 
     # --- NISAR ---------------------------------------------------------------
 
@@ -395,9 +399,17 @@ class ContextService:
     ) -> dict[str, Any]:
         first, last = resolve_window(days, start, end)
         if (last - first).days + 1 > MAX_FIRE_DAYS:
-            raise AppError(f"fire lookups cover at most {MAX_FIRE_DAYS} days per request")
+            raise AppError(
+                f"fire lookups cover at most {MAX_FIRE_DAYS} days per request",
+                code="window_too_long",
+                params={"days": str(MAX_FIRE_DAYS)},
+            )
         if not self.firms.configured:
-            raise UpstreamError("FIRMS_API_KEY is not set: fires cannot be queried")
+            raise UpstreamError(
+                "FIRMS_API_KEY is not set: fires cannot be queried",
+                code="upstream_not_configured",
+                params={"source": "FIRMS"},
+            )
 
         def produce() -> dict[str, Any]:
             delta_lat = min(radius_km / 111.0, MAX_FIRE_DELTA_DEG)
@@ -498,8 +510,9 @@ class ContextService:
                 {
                     "date": granule["start"],
                     "kind": "nisar",
-                    "title": f"Adquisición NISAR GCOV (track {granule['track']}, frame {granule['frame']})",
                     "product_id": granule["product_id"],
+                    "track": granule["track"],
+                    "frame": granule["frame"],
                     "browse_png": granule["browse_png"],
                 }
                 for granule in payload["granules"]
@@ -512,9 +525,6 @@ class ContextService:
                 {
                     "date": item["time"],
                     "kind": "earthquake",
-                    "title": f"Sismo M{item['magnitude']:.1f}"
-                    if item["magnitude"] is not None
-                    else "Sismo",
                     "detail": item["place"],
                     "magnitude": item["magnitude"],
                     "distance_km": item["distance_km"],
@@ -538,7 +548,6 @@ class ContextService:
                 {
                     "date": f"{point['date']}T12:00:00+00:00",
                     "kind": "precipitation",
-                    "title": f"Lluvia intensa: {point['mm']:.0f} mm en el día",
                     "mm": point["mm"],
                 }
                 for point in payload["series"]
@@ -559,7 +568,6 @@ class ContextService:
                 {
                     "date": f"{day}T12:00:00+00:00",
                     "kind": "fire",
-                    "title": f"{count} foco(s) de fuego activo",
                     "detections": count,
                 }
                 for day, count in payload["detections_by_day"].items()

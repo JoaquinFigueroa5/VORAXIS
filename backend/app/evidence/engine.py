@@ -147,7 +147,6 @@ def run(db, context) -> None:
         change.change_type = result.change_type
         change.classification = {
             "type": result.change_type,
-            "label": result.label,
             "confidence": result.confidence,
             "reasons": result.reasons,
         }
