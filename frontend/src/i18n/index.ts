@@ -1,4 +1,4 @@
-import type { Locale } from "@/stores/locale";
+import { useLocale, type Locale } from "@/stores/locale";
 import { en } from "./en";
 import { es } from "./es";
 
@@ -8,13 +8,19 @@ export interface Coded {
   params?: Record<string, unknown> | null;
 }
 
+export type MessageKey = keyof typeof es;
+
 const DICTIONARIES: Record<Locale, Record<string, string>> = { es, en };
 
-/**
- * The pages are still written in Spanish, so backend codes are written in Spanish too.
- * Switch this to `useLocale` once every page reads its copy through `t()`.
- */
-const UI_LOCALE: Locale = "es";
+/** The language the interface is being written in right now. */
+export function currentLocale(): Locale {
+  return useLocale.getState().locale;
+}
+
+/** For `Intl` and `toLocaleString`. */
+export function intlLocale(): string {
+  return currentLocale() === "en" ? "en-US" : "es";
+}
 
 function fill(template: string, params?: Record<string, unknown> | null): string {
   if (!params) return template;
@@ -23,14 +29,24 @@ function fill(template: string, params?: Record<string, unknown> | null): string
   );
 }
 
-/** The text for `key`, or `fallback` (the key itself if none) when the dictionary lacks it. */
+/**
+ * The text for `key` in the current language, or `fallback` (the key itself if
+ * none) when the dictionary lacks it. Outside components it reads the language
+ * at call time; components call `useT()` so they re-render when it changes.
+ */
 export function t(key: string, params?: Record<string, unknown> | null, fallback?: string): string {
-  const template = DICTIONARIES[UI_LOCALE][key];
+  const template = DICTIONARIES[currentLocale()][key];
   return template === undefined ? (fallback ?? key) : fill(template, params);
 }
 
+/** `t` for components: subscribes to the language, so switching it re-renders. */
+export function useT(): typeof t {
+  useLocale((state) => state.locale);
+  return t;
+}
+
 export function has(key: string): boolean {
-  return key in DICTIONARIES[UI_LOCALE];
+  return key in DICTIONARIES[currentLocale()];
 }
 
 /** A source code (FIRMS, USGS...) as people read it. */
@@ -44,4 +60,15 @@ export function coded(section: string, message: Coded, fallback?: string): strin
   const params = { ...(message.params ?? {}) };
   if ("source" in params) params.source = sourceName(params.source);
   return t(`${section}.${message.code}`, params, fallback);
+}
+
+// Screen readers and hyphenation follow <html lang>; the tab title follows the language too.
+function syncDocument(locale: Locale) {
+  document.documentElement.lang = locale;
+  document.title = DICTIONARIES[locale]["app.title"] ?? document.title;
+}
+
+if (typeof document !== "undefined") {
+  syncDocument(currentLocale());
+  useLocale.subscribe((state) => syncDocument(state.locale));
 }

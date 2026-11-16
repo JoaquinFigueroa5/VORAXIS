@@ -8,8 +8,9 @@ import {
 } from "@/observatory/maplibre";
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
+import { useT } from "@/i18n";
 import { BasemapSwitch, applyBasemap, basemapSources, useBasemap, type BasemapId } from "@/observatory/basemap";
-import { API_ORIGIN, CHANGE_TYPES, type Bounds } from "@/observatory/lib";
+import { API_ORIGIN, TYPE_COLORS, type Bounds } from "@/observatory/lib";
 import { changesService } from "@/services/changes.service";
 import type { TileDescription } from "@/types/change";
 
@@ -36,8 +37,8 @@ const RADAR_CREDIT = "Radar: NISAR (NASA/ISRO), ASF DAAC";
 const TYPE_COLOR: ExpressionSpecification = [
   "match",
   ["get", "change_type"],
-  ...Object.entries(CHANGE_TYPES).flatMap(([type, style]) => [type, style.color]),
-  CHANGE_TYPES.UNCLASSIFIED.color,
+  ...Object.entries(TYPE_COLORS).flatMap(([type, color]) => [type, color]),
+  TYPE_COLORS.UNCLASSIFIED,
 ] as unknown as ExpressionSpecification;
 
 function style(jobId: string, tiles: TileDescription, radar: "before" | "after", basemap: BasemapId): StyleSpecification {
@@ -132,6 +133,7 @@ export function CompareMap({
   const select = useRef(onSelect);
   select.current = onSelect;
   const [ready, setReady] = useState(false);
+  const t = useT();
   const [position, setPosition] = useState(50);
   // The landing hero keeps the grey map; everywhere else the user's choice.
   const chosen = useBasemap();
@@ -259,14 +261,14 @@ export function CompareMap({
 
       {mode === "comparar" ? (
         <>
-          <span className="tag left">Antes, {beforeLabel}</span>
-          <span className="tag right">Después, {afterLabel}</span>
+          <span className="tag left">{t("map.tag.before", { date: beforeLabel })}</span>
+          <span className="tag right">{t("map.tag.after", { date: afterLabel })}</span>
           <div
             className="swipe"
             style={{ left: `${position}%` }}
             role="slider"
             tabIndex={0}
-            aria-label="Deslizar entre la imagen de antes y la de después"
+            aria-label={t("map.slider")}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(position)}
@@ -289,7 +291,11 @@ export function CompareMap({
         </>
       ) : (
         <span className="tag left">
-          {mode === "antes" ? `Antes, ${beforeLabel}` : mode === "despues" ? `Después, ${afterLabel}` : `Cambio entre ${beforeLabel} y ${afterLabel}`}
+          {mode === "antes"
+            ? t("map.tag.before", { date: beforeLabel })
+            : mode === "despues"
+              ? t("map.tag.after", { date: afterLabel })
+              : t("map.tag.change", { from: beforeLabel, to: afterLabel })}
         </span>
       )}
     </div>

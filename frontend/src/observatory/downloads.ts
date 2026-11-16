@@ -17,13 +17,10 @@ import type { AnalysisRequest } from "@/types/analysis";
 import type { IngestTask } from "@/types/ingest";
 import type { ProcessingJob } from "@/types/job";
 
-export const STAGE: Record<string, string> = {
-  QUEUED: "En cola",
-  DOWNLOADING: "Descargando de NASA",
-  CONVERTING: "Recortando a la zona",
-  UPLOADING: "Guardando",
-  READY: "Lista",
-};
+/** One ingest stage (QUEUED, DOWNLOADING...) in words. */
+export function stageLabel(stage: string | null | undefined): string {
+  return t(`downloads.stage.${stage ?? "QUEUED"}`, null, stage ?? "");
+}
 
 /** What the wizard and the downloads menu ask for: HH, 3σ (fewer false positives on real data). */
 export const DEFAULT_ANALYSIS: AnalysisRequest["parameters"] = {
@@ -165,15 +162,15 @@ export function downloadedText(task: IngestTask): string {
 
 /** The worker reports Python exceptions; say what happened in words and keep the original for the tooltip. */
 export function failureText(error: string | null): string {
-  if (!error) return "No se pudo preparar una de las imágenes.";
+  if (!error) return t("downloads.fail.generic");
   if (/timed out|timeout|ConnectionError|ConnectionPool|Connection reset|IncompleteRead|ChunkedEncoding/i.test(error)) {
-    return "Se cortó la conexión con NASA durante la descarga. Suele ser pasajero: vuelve a intentarlo.";
+    return t("downloads.fail.connection");
   }
   if (/401|403|Unauthorized|Forbidden|credential|Earthdata/i.test(error)) {
-    return "NASA Earthdata rechazó la descarga. Revisa las credenciales del servidor.";
+    return t("downloads.fail.auth");
   }
-  if (/No space left|disk/i.test(error)) return "El servidor se quedó sin espacio en disco.";
-  if (/not found|404/i.test(error)) return "NASA ya no ofrece este producto.";
+  if (/No space left|disk/i.test(error)) return t("downloads.fail.disk");
+  if (/not found|404/i.test(error)) return t("downloads.fail.missing");
   return error.length > 160 ? `${error.slice(0, 157)}…` : error;
 }
 

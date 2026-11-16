@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { coded, t } from "@/i18n";
+import { coded, t, useT } from "@/i18n";
 import { ChangePanel } from "@/observatory/ChangePanel";
 import { CompareMap, type ViewMode } from "@/observatory/CompareMap";
 import { IntervalStrip } from "@/observatory/IntervalStrip";
@@ -18,22 +18,7 @@ import { useInterface } from "@/stores/interface";
 import type { TileDescription } from "@/types/change";
 import { FINAL_JOB_STATUSES } from "@/types/job";
 
-const MODES: { id: ViewMode; label: string }[] = [
-  { id: "comparar", label: "Comparar" },
-  { id: "cambio", label: "Cambio" },
-  { id: "antes", label: "Antes" },
-  { id: "despues", label: "Después" },
-];
-
-const STEP_LABELS: Record<string, string> = {
-  DOWNLOADING: "Trayendo las imágenes",
-  PREPROCESSING: "Leyendo las imágenes",
-  ALIGNMENT: "Alineando las dos fechas",
-  CHANGE_DETECTION: "Detectando cambios",
-  VECTORIZATION: "Delimitando las áreas",
-  EVIDENCE_ANALYSIS: "Buscando sismos, incendios y lluvia",
-  EXPORTING: "Guardando los mapas",
-};
+const MODES: ViewMode[] = ["comparar", "cambio", "antes", "despues"];
 
 /** Known failures come as a code (`cancelled_by_user`); anything else is the worker's own message. */
 function jobError(message: string | null): string {
@@ -43,6 +28,7 @@ function jobError(message: string | null): string {
 
 export function AnalysisPage() {
   const { id = "" } = useParams();
+  const t = useT();
   const [mode, setMode] = useState<ViewMode>("comparar");
   const [showPolygons, setShowPolygons] = useState(true);
   const [hidden, setHidden] = useState<string[]>([]);
@@ -120,14 +106,14 @@ export function AnalysisPage() {
     retry: false,
   });
 
-  if (job.isLoading) return <div className="page"><div className="inner quiet">Abriendo el análisis…</div></div>;
+  if (job.isLoading) return <div className="page"><div className="inner quiet">{t("analysis.opening")}</div></div>;
   if (job.isError || !job.data) {
     return (
       <div className="page">
         <div className="inner">
-          <p className="notice problem">Este análisis no existe o la API no responde.</p>
+          <p className="notice problem">{t("analysis.missing")}</p>
           <p style={{ marginTop: "1rem" }}>
-            <Link className="btn tonal" to="/">Ver todos los análisis</Link>
+            <Link className="btn tonal" to="/">{t("analysis.see_all")}</Link>
           </p>
         </div>
       </div>
@@ -140,7 +126,7 @@ export function AnalysisPage() {
       <div className="page">
         <div className="inner" style={{ maxWidth: 560 }}>
           <h1 className="title">
-            {failed ? "El análisis no terminó" : "Analizando las dos fechas"}
+            {t(failed ? "analysis.failed_title" : "analysis.running_title")}
           </h1>
           {failed ? (
             <p className="notice problem" style={{ marginTop: "1rem" }}>
@@ -149,11 +135,11 @@ export function AnalysisPage() {
           ) : (
             <>
               <p className="quiet" style={{ margin: "12px 0 20px" }}>
-                {STEP_LABELS[job.data.current_step ?? ""] ?? "En cola, esperando su turno"}.
+                {t(`analysis.step.${job.data.current_step ?? ""}`, null, t("analysis.step.queued"))}.
               </p>
               <div className="bar"><i style={{ transform: `scaleX(${job.data.progress / 100})` }} /></div>
               <p className="label" style={{ marginTop: 12 }}>
-                Suele tardar entre unos segundos y dos minutos. Esta página se actualiza sola.
+                {t("analysis.running_hint")}
               </p>
             </>
           )}
@@ -171,73 +157,76 @@ export function AnalysisPage() {
 
   return (
     <div className={`viewer${selected ? " with-detail" : ""}`}>
-      <aside className="rail" aria-label="Resumen del análisis">
+      <aside className="rail" aria-label={t("analysis.summary_aria")}>
         <div className="block">
           <p className="label">
-            {shortDate(before)} a {shortDate(after, true)}
+            {t("home.range", { from: shortDate(before), to: shortDate(after, true) })}
             {location.data?.country ? `, ${location.data.country}` : ""}
           </p>
           <h1 className="title" style={{ margin: "8px 0 0" }}>
-            {location.data?.name ?? "Zona de estudio"}
+            {location.data?.name ?? t("home.window.zone")}
           </h1>
           {totals ? (
             <>
               <p className="figure" style={{ marginTop: 28 }}>{area(totals.area_km2)}</p>
               <p className="quiet" style={{ marginTop: 8 }}>
-                con cambios, en {number(totals.changes, 0)} áreas. Señal {String(job.data.result?.polarization ?? "HH")},
-                umbral de {number(totals.threshold_db, 1)} dB.
+                {t("analysis.headline", {
+                  count: number(totals.changes, 0),
+                  polarization: String(job.data.result?.polarization ?? "HH"),
+                  threshold: number(totals.threshold_db, 1),
+                })}
               </p>
               <dl className="facts" style={{ marginTop: 20 }}>
                 <div>
-                  <dt>Área afectada</dt>
+                  <dt>{t("analysis.fact.area")}</dt>
                   <dd className="num">{area(totals.area_km2)}</dd>
                 </div>
                 <div>
-                  <dt>Intensidad relativa</dt>
+                  <dt>{t("analysis.fact.score")}</dt>
                   <dd className="num">{number(totals.mean_score, 2)}</dd>
                 </div>
                 <div>
-                  <dt>Píxeles válidos</dt>
+                  <dt>{t("metric.valid_pixel_percentage")}</dt>
                   <dd className="num">
                     {totals.valid_pixel_percentage != null
                       ? `${number(totals.valid_pixel_percentage, 1)} %`
-                      : "sin dato"}
+                      : t("value.no_data")}
                   </dd>
                 </div>
                 <div>
-                  <dt>Intervalo</dt>
+                  <dt>{t("analysis.fact.interval")}</dt>
                   <dd className="num">
-                    {intervalDays != null ? `${number(intervalDays, 0)} días` : "sin dato"}
+                    {intervalDays != null ? `${number(intervalDays, 0)} ${t("home.unit.days")}` : t("value.no_data")}
                   </dd>
                 </div>
               </dl>
               {scientific ? (
                 <dl className="facts" style={{ marginTop: 16 }}>
                   <div>
-                    <dt>Producto</dt>
-                    <dd className="num">{beforeObservation.data?.product_type ?? "sin dato"}</dd>
+                    <dt>{t("analysis.fact.product")}</dt>
+                    <dd className="num">{beforeObservation.data?.product_type ?? t("value.no_data")}</dd>
                   </div>
                   <div>
-                    <dt>Madurez</dt>
-                    <dd className="num">{beforeObservation.data?.maturity ?? "sin dato"}</dd>
+                    <dt>{t("analysis.fact.maturity")}</dt>
+                    <dd className="num">{beforeObservation.data?.maturity ?? t("value.no_data")}</dd>
                   </div>
                   <div>
-                    <dt>Polarización</dt>
+                    <dt>{t("analysis.fact.polarization")}</dt>
                     <dd className="num">
                       {beforeObservation.data?.polarization?.join(" · ") ??
-                        String(job.data.result?.polarization ?? "sin dato")}
+                        String(job.data.result?.polarization ?? t("value.no_data"))}
                     </dd>
                   </div>
                   <div>
-                    <dt>Órbita</dt>
-                    <dd className="num">{beforeObservation.data?.orbit_direction ?? "sin dato"}</dd>
+                    <dt>{t("analysis.fact.orbit")}</dt>
+                    <dd className="num">{beforeObservation.data?.orbit_direction ?? t("value.no_data")}</dd>
                   </div>
                   <div>
-                    <dt>Versión de proceso</dt>
-                    <dd className="num">{beforeObservation.data?.processing_version ?? "sin dato"}</dd>
+                    <dt>{t("analysis.fact.version")}</dt>
+                    <dd className="num">{beforeObservation.data?.processing_version ?? t("value.no_data")}</dd>
                   </div>
                   <div>
-                    <dt>Análisis</dt>
+                    <dt>{t("home.stat.analyses")}</dt>
                     <dd className="num">{id.slice(0, 8)}</dd>
                   </div>
                 </dl>
@@ -250,30 +239,26 @@ export function AnalysisPage() {
           <div
             className="segmented"
             role="group"
-            aria-label="Qué mostrar en el mapa"
-            style={{ "--n": MODES.length, "--i": MODES.findIndex((option) => option.id === mode) } as React.CSSProperties}
+            aria-label={t("analysis.mode_aria")}
+            style={{ "--n": MODES.length, "--i": MODES.indexOf(mode) } as React.CSSProperties}
           >
             {MODES.map((option) => (
-              <button key={option.id} aria-pressed={mode === option.id} onClick={() => setMode(option.id)}>
-                {option.label}
+              <button key={option} aria-pressed={mode === option} onClick={() => setMode(option)}>
+                {t(`analysis.mode.${option}`)}
               </button>
             ))}
           </div>
           <p className="quiet" style={{ marginTop: 14 }}>
-            {mode === "comparar"
-              ? "Arrastra la línea del mapa para pasar de la imagen de antes a la de después."
-              : mode === "cambio"
-                ? "Rojo: la superficie se oscureció. Azul: se aclaró. Transparente: sin cambio."
-                : "Imagen de radar en escala de grises: oscuro refleja poco (agua), claro refleja mucho."}
+            {t(mode === "comparar" ? "analysis.hint.compare" : mode === "cambio" ? "analysis.hint.change" : "analysis.hint.image")}
           </p>
           <label className="check" style={{ marginTop: 16 }}>
             <input type="checkbox" checked={showPolygons} onChange={(event) => setShowPolygons(event.target.checked)} />
-            Mostrar las áreas detectadas
+            {t("analysis.show_areas")}
           </label>
         </div>
 
         <div className="block">
-          <h2>Qué tipo de cambio</h2>
+          <h2>{t("analysis.types.title")}</h2>
           {(insights.data?.by_type ?? []).map((row) => {
             const style = typeStyle(row.change_type);
             const on = !hidden.includes(row.change_type);
@@ -282,7 +267,7 @@ export function AnalysisPage() {
                 key={row.change_type}
                 className="typerow"
                 aria-pressed={on}
-                title={on ? "Ocultar en el mapa" : "Mostrar en el mapa"}
+                title={t(on ? "analysis.types.hide" : "analysis.types.show")}
                 onClick={() =>
                   setHidden((current) =>
                     on ? [...current, row.change_type] : current.filter((type) => type !== row.change_type),
@@ -299,19 +284,19 @@ export function AnalysisPage() {
             );
           })}
           <p className="label" style={{ marginTop: 14 }}>
-            Son hipótesis a partir de la señal del radar y de los eventos cercanos, no clasificaciones validadas.
+            {t("analysis.types.note")}
           </p>
         </div>
 
         <div className="block">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>Áreas {order === "area" ? "más grandes" : "más intensas"}</h2>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>{t(order === "area" ? "analysis.list.largest" : "analysis.list.strongest")}</h2>
             <button className="btn tonal small" onClick={() => setOrder(order === "area" ? "score" : "area")}>
-              {order === "area" ? "Ver las más intensas" : "Ver las más grandes"}
+              {t(order === "area" ? "analysis.list.see_strongest" : "analysis.list.see_largest")}
             </button>
           </div>
-          {shown.length === 0 ? <p className="quiet">Activa algún tipo de cambio para ver sus áreas.</p> : null}
-          {list.isLoading ? <p className="quiet">Cargando áreas…</p> : null}
+          {shown.length === 0 ? <p className="quiet">{t("analysis.list.none_shown")}</p> : null}
+          {list.isLoading ? <p className="quiet">{t("analysis.list.loading")}</p> : null}
           {(list.data?.items ?? []).map((change) => (
             <button
               key={change.id}
@@ -325,7 +310,7 @@ export function AnalysisPage() {
               <span className="dot" style={{ background: typeStyle(change.change_type).color }} />
               <span>
                 {area(change.area_km2)}
-                <span className="quiet"> {typeStyle(change.change_type).label.replace("Posible ", "")}</span>
+                <span className="quiet"> {t(`changeType.${change.change_type}.short`, null, typeStyle(change.change_type).label)}</span>
               </span>
               <span className="num" style={{ color: change.direction === "DECREASE" ? "var(--color-darker)" : "var(--color-brighter)" }}>
                 {signedDb(change.mean_change_db)}
@@ -334,24 +319,25 @@ export function AnalysisPage() {
           ))}
           {list.data && list.data.total > list.data.items.length ? (
             <p className="label" style={{ marginTop: 12 }}>
-              Se listan {list.data.items.length} de {number(list.data.total, 0)}. El resto está en el mapa: haz clic en cualquier área.
+              {t("analysis.list.partial", { shown: list.data.items.length, total: number(list.data.total, 0) })}
             </p>
           ) : null}
         </div>
 
         {warnings.length > 0 || sources.length > 0 || (totals?.aoi_coverage_percentage ?? 100) < 60 ? (
           <div className="block">
-            <h2>Antes de sacar conclusiones</h2>
+            <h2>{t("analysis.caveats.title")}</h2>
             <div style={{ display: "grid", gap: 8 }}>
               {(totals?.aoi_coverage_percentage ?? 100) < 60 ? (
                 <p className="notice">
-                  El radar solo cubrió el {number(totals?.aoi_coverage_percentage, 0)} % de la zona; fuera de esa franja puede haber cambios que no se ven.
+                  {t("analysis.caveats.coverage", { pct: number(totals?.aoi_coverage_percentage, 0) })}
                 </p>
               ) : null}
               {sources.map(([name, info]) => (
                 <p key={name} className="notice">
-                  {name === "FIRMS" ? "Incendios" : name === "USGS" ? "Sismos" : "Lluvia"} sin consultar:{" "}
-                  {info.status === "skipped" ? "falta configurar la clave de acceso." : "la fuente no respondió."}
+                  {t(info.status === "skipped" ? "analysis.caveats.source_key" : "analysis.caveats.source_down", {
+                    source: t(`analysis.caveats.kind.${name}`, null, name),
+                  })}
                 </p>
               ))}
               {warnings.map((warning, index) => (
@@ -378,7 +364,7 @@ export function AnalysisPage() {
           />
         ) : (
           <div className="compare" style={{ display: "grid", placeItems: "center" }}>
-            <p className="quiet">{tiles.isError ? "No se pudieron cargar las imágenes de este análisis." : "Cargando el mapa…"}</p>
+            <p className="quiet">{t(tiles.isError ? "analysis.map.error" : "analysis.map.loading")}</p>
           </div>
         )}
         {before && after ? (

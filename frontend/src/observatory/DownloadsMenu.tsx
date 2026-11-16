@@ -3,7 +3,6 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import {
-  STAGE,
   acquisitionDate,
   downloadedText,
   failureText,
@@ -11,22 +10,16 @@ import {
   jobForPair,
   launchAnalysis,
   retryBatch,
+  stageLabel,
   useIngestTasks,
   useJobs,
   type Batch,
 } from "@/observatory/downloads";
+import { useT } from "@/i18n";
 import { number, shortDate } from "@/observatory/lib";
 import { ApiError } from "@/services/api";
 import { locationsService } from "@/services/locations.service";
 import type { ProcessingJob } from "@/types/job";
-
-const JOB_STATE: Record<string, string> = {
-  PENDING: "Análisis en cola",
-  RUNNING: "Analizando",
-  COMPLETED: "Análisis listo",
-  FAILED: "El análisis falló",
-  CANCELLED: "Análisis cancelado",
-};
 
 function ArrowDown() {
   return (
@@ -45,6 +38,7 @@ export function DownloadsMenu() {
   const root = useRef<HTMLDivElement | null>(null);
   const panelId = useId();
   const route = useLocation();
+  const t = useT();
 
   const ingest = useIngestTasks();
   const batches = useMemo(() => groupBatches(ingest.data ?? []), [ingest.data]);
@@ -79,7 +73,7 @@ export function DownloadsMenu() {
     progress !== null
       ? `${number(progress, 0)} %`
       : waiting.length
-        ? `${waiting.length} ${waiting.length === 1 ? "lista" : "listas"}`
+        ? t(waiting.length === 1 ? "downloads.ready_one" : "downloads.ready_many", { count: waiting.length })
         : null;
 
   return (
@@ -92,7 +86,7 @@ export function DownloadsMenu() {
         onClick={() => setOpen((value) => !value)}
       >
         <ArrowDown />
-        <span className="downloads__word">Descargas</span>
+        <span className="downloads__word">{t("downloads.title")}</span>
         {summary ? <span className="downloads__count num">{summary}</span> : null}
         {progress !== null ? (
           <span className="downloads__track" aria-hidden="true">
@@ -102,10 +96,10 @@ export function DownloadsMenu() {
       </button>
 
       {open ? (
-        <div className="downloads__panel" id={panelId} role="region" aria-label="Descargas de NISAR">
+        <div className="downloads__panel" id={panelId} role="region" aria-label={t("downloads.panel_aria")}>
           <div className="downloads__head">
-            <strong>Descargas</strong>
-            <span className="label">Últimas 24 horas</span>
+            <strong>{t("downloads.title")}</strong>
+            <span className="label">{t("downloads.last_24h")}</span>
           </div>
           <ul className="downloads__list">
             {batches.map((batch) => (
@@ -113,7 +107,7 @@ export function DownloadsMenu() {
             ))}
           </ul>
           <p className="downloads__foot label">
-            El servidor descarga una imagen a la vez. Puedes cerrar esta ventana o cambiar de página: la descarga sigue.
+            {t("downloads.foot")}
           </p>
         </div>
       ) : null}
@@ -124,10 +118,11 @@ export function DownloadsMenu() {
 function BatchRow({ batch, jobs, onDone }: { batch: Batch; jobs: ProcessingJob[] | undefined; onDone: () => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const locations = useQuery({ queryKey: ["locations"], queryFn: () => locationsService.list(200) });
-  const zone = locations.data?.find((item) => item.id === batch.locationId)?.name ?? "Zona";
+  const zone = locations.data?.find((item) => item.id === batch.locationId)?.name ?? t("downloads.zone");
   const job = jobForPair(jobs, batch.pair);
   const [first, second] = batch.tasks.map((task) => acquisitionDate(task.product_id));
   const failedError = batch.tasks.find((task) => task.status === "FAILED")?.error ?? null;
@@ -142,7 +137,7 @@ function BatchRow({ batch, jobs, onDone }: { batch: Batch; jobs: ProcessingJob[]
       onDone();
       navigate(`/analisis/${accepted.job_id}`);
     } catch (error) {
-      setProblem(error instanceof ApiError || error instanceof Error ? error.message : "No se pudo iniciar el análisis.");
+      setProblem(error instanceof ApiError || error instanceof Error ? error.message : t("downloads.error.launch"));
       setBusy(false);
     }
   }
@@ -154,7 +149,7 @@ function BatchRow({ batch, jobs, onDone }: { batch: Batch; jobs: ProcessingJob[]
       await retryBatch(batch);
       await queryClient.invalidateQueries({ queryKey: ["ingest"] });
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : "No se pudo volver a encolar.");
+      setProblem(error instanceof Error ? error.message : t("downloads.error.retry"));
     } finally {
       setBusy(false);
     }
@@ -165,8 +160,8 @@ function BatchRow({ batch, jobs, onDone }: { batch: Batch; jobs: ProcessingJob[]
       <div className="downloads__title">
         <strong>{zone}</strong>
         <span className="label">
-          {first ? shortDate(first) : "sin fecha"}
-          {second ? ` a ${shortDate(second, true)}` : ""}
+          {first ? shortDate(first) : t("value.no_date")}
+          {second ? ` ${t("downloads.to")} ${shortDate(second, true)}` : ""}
         </span>
       </div>
 
@@ -175,9 +170,9 @@ function BatchRow({ batch, jobs, onDone }: { batch: Batch; jobs: ProcessingJob[]
           {batch.tasks.map((task, index) => (
             <div key={task.id}>
               <div className="downloads__task">
-                <span>{batch.tasks.length === 2 ? (index === 0 ? "Antes" : "Después") : "Imagen"}</span>
+                <span>{t(batch.tasks.length === 2 ? (index === 0 ? "downloads.before" : "downloads.after") : "downloads.image")}</span>
                 <span className="quiet">
-                  {task.status === "FAILED" ? "Falló" : STAGE[task.stage ?? "QUEUED"]}
+                  {task.status === "FAILED" ? t("downloads.failed") : stageLabel(task.stage)}
                   {task.status !== "COMPLETED" && downloadedText(task) ? `, ${downloadedText(task)}` : ""}
                 </span>
               </div>
@@ -195,7 +190,7 @@ function BatchRow({ batch, jobs, onDone }: { batch: Batch; jobs: ProcessingJob[]
             {failureText(failedError)}
           </p>
           <button className="btn tonal small" disabled={busy} onClick={retry}>
-            {busy ? "Encolando…" : "Reintentar"}
+            {busy ? t("downloads.queueing") : t("action.retry")}
           </button>
         </>
       ) : null}
@@ -203,25 +198,25 @@ function BatchRow({ batch, jobs, onDone }: { batch: Batch; jobs: ProcessingJob[]
       {batch.state === "ready" && job ? (
         <div className="downloads__row">
           <span className="quiet">
-            {JOB_STATE[job.status] ?? job.status}
+            {t(`downloads.job.${job.status}`, null, job.status)}
             {job.status === "RUNNING" ? `, ${job.progress} %` : ""}
           </span>
           <Link className="btn tonal small" to={`/analisis/${job.id}`} onClick={onDone}>
-            Ver análisis
+            {t("downloads.view_analysis")}
           </Link>
         </div>
       ) : null}
 
       {batch.state === "ready" && !job ? (
         <div className="downloads__row">
-          <span className="quiet">Las dos imágenes están listas</span>
+          <span className="quiet">{t("downloads.both_ready")}</span>
           <button className="btn small" disabled={busy} onClick={compare}>
-            {busy ? "Iniciando…" : "Comparar"}
+            {busy ? t("downloads.starting") : t("downloads.compare")}
           </button>
         </div>
       ) : null}
 
-      {batch.state === "partial" ? <p className="quiet">Imagen preparada. Elige su par en Nuevo análisis.</p> : null}
+      {batch.state === "partial" ? <p className="quiet">{t("downloads.partial")}</p> : null}
 
       {problem ? <p className="downloads__error">{problem}</p> : null}
     </li>

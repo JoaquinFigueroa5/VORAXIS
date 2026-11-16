@@ -1,5 +1,6 @@
 import type { MultiPolygon, Polygon } from "geojson";
 
+import { intlLocale, t } from "@/i18n";
 import { API_URL } from "@/services/api";
 
 /** Scheme + host of the API: tile paths from the backend already carry /api/v1. */
@@ -12,66 +13,48 @@ export interface ChangeTypeStyle {
   reading: string;
 }
 
-export const CHANGE_TYPES: Record<string, ChangeTypeStyle> = {
-  POSSIBLE_FLOODING: {
-    label: "Posible inundación",
-    color: "#1f6fb2",
-    reading:
-      "La superficie se oscureció para el radar. El agua en calma refleja la señal lejos del satélite, así que el terreno anegado se ve más oscuro.",
-  },
-  POSSIBLE_FLOODED_VEGETATION: {
-    label: "Posible vegetación inundada",
-    color: "#2a9d8f",
-    reading:
-      "La superficie se aclaró tras lluvia anómala. Agua bajo vegetación hace rebotar la señal dos veces (agua y tallos) y la devuelve con más fuerza.",
-  },
-  POSSIBLE_BURN_SCAR: {
-    label: "Posible área quemada",
-    color: "#c2410c",
-    reading:
-      "Hay focos de fuego activo junto al área en el intervalo. Al quemarse la vegetación, la señal de radar suele bajar.",
-  },
-  POSSIBLE_VEGETATION_LOSS: {
-    label: "Posible pérdida de vegetación",
-    color: "#8d6e3f",
-    reading:
-      "La señal bajó desde un nivel propio de vegetación densa, sin fuego cercano ni firma de agua. Es compatible con tala o cosecha.",
-  },
-  POSSIBLE_WATER_RECESSION: {
-    label: "Posible retroceso de agua",
-    color: "#7c8fa6",
-    reading:
-      "Una superficie que tenía firma de agua en la primera fecha dejó de tenerla en la segunda.",
-  },
-  POSSIBLE_SEISMIC_DISTURBANCE: {
-    label: "Posible alteración por sismo",
-    color: "#b0305c",
-    reading:
-      "Hubo un sismo fuerte cerca en el intervalo. Esta medida no mide desplazamiento del terreno; es solo una coincidencia a revisar.",
-  },
-  UNCLASSIFIED: {
-    label: "Cambio sin clasificar",
-    color: "#7a7a7a",
-    reading:
-      "La señal cambió, pero ni su firma ni los eventos cercanos permiten proponer una causa.",
-  },
+/** Colours are fixed; the words come from the dictionaries (`changeType.<type>.label`). */
+export const TYPE_COLORS: Record<string, string> = {
+  POSSIBLE_FLOODING: "#1f6fb2",
+  POSSIBLE_FLOODED_VEGETATION: "#2a9d8f",
+  POSSIBLE_BURN_SCAR: "#c2410c",
+  POSSIBLE_VEGETATION_LOSS: "#8d6e3f",
+  POSSIBLE_WATER_RECESSION: "#7c8fa6",
+  POSSIBLE_SEISMIC_DISTURBANCE: "#b0305c",
+  UNCLASSIFIED: "#7a7a7a",
 };
 
 export function typeStyle(changeType: string): ChangeTypeStyle {
-  return CHANGE_TYPES[changeType] ?? { ...CHANGE_TYPES.UNCLASSIFIED, label: changeType };
+  const known = changeType in TYPE_COLORS;
+  const type = known ? changeType : "UNCLASSIFIED";
+  return {
+    label: known ? t(`changeType.${type}.label`) : changeType,
+    color: TYPE_COLORS[type],
+    reading: t(`changeType.${type}.reading`),
+  };
 }
 
-const DAY = new Intl.DateTimeFormat("es", { day: "numeric", month: "short", timeZone: "UTC" });
-const DAY_YEAR = new Intl.DateTimeFormat("es", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
+const formats = new Map<string, Intl.DateTimeFormat>();
+
+function dateFormat(withYear: boolean): Intl.DateTimeFormat {
+  const locale = intlLocale();
+  const key = `${locale}:${withYear}`;
+  let format = formats.get(key);
+  if (!format) {
+    format = new Intl.DateTimeFormat(locale, {
+      day: "numeric",
+      month: "short",
+      ...(withYear ? { year: "numeric" } : {}),
+      timeZone: "UTC",
+    });
+    formats.set(key, format);
+  }
+  return format;
+}
 
 export function shortDate(value: string | null | undefined, withYear = false): string {
-  if (!value) return "sin fecha";
-  return (withYear ? DAY_YEAR : DAY).format(new Date(value)).replace(".", "");
+  if (!value) return t("value.no_date");
+  return dateFormat(withYear).format(new Date(value)).replace(".", "");
 }
 
 export function isoDay(value: string): string {
@@ -85,23 +68,23 @@ export function addDays(day: string, amount: number): string {
 }
 
 export function number(value: number | null | undefined, digits = 1): string {
-  if (value === null || value === undefined) return "sin dato";
-  return value.toLocaleString("es", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  if (value === null || value === undefined) return t("value.no_data");
+  return value.toLocaleString(intlLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 export function area(km2: number | null | undefined): string {
-  if (km2 === null || km2 === undefined) return "sin dato";
+  if (km2 === null || km2 === undefined) return t("value.no_data");
   if (km2 < 1) return `${number(km2 * 100, km2 < 0.1 ? 1 : 0)} ha`;
   return `${number(km2, km2 < 10 ? 2 : 1)} km²`;
 }
 
 export function signedDb(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "sin dato";
+  if (value === null || value === undefined) return t("value.no_data");
   return `${value > 0 ? "+" : "−"}${number(Math.abs(value), 1)} dB`;
 }
 
 export function db(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "sin dato";
+  if (value === null || value === undefined) return t("value.no_data");
   return `${value < 0 ? "−" : ""}${number(Math.abs(value), 1)} dB`;
 }
 

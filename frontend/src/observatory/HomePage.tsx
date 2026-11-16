@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } fr
 import { Link, useNavigate } from "react-router-dom";
 
 import { useInView } from "@/hooks/useInView";
+import { useT } from "@/i18n";
 import { CompareMap } from "@/observatory/CompareMap";
 import { area, number, shortDate, signedDb, typeStyle } from "@/observatory/lib";
 import { apiFetch } from "@/services/api";
@@ -11,31 +12,22 @@ import { insightsService } from "@/services/insights.service";
 import { jobsService } from "@/services/jobs.service";
 import { locationsService } from "@/services/locations.service";
 import { observationsService } from "@/services/observations.service";
+import { useLocale } from "@/stores/locale";
 import type { TileDescription } from "@/types/change";
 import type { ProcessingJob } from "@/types/job";
 
-const STATUS: Record<string, string> = {
-  PENDING: "En cola",
-  RUNNING: "En curso",
-  COMPLETED: "Listo",
-  FAILED: "No terminó",
-  CANCELLED: "Cancelado",
-};
-
 const LIST_LIMIT = 6;
 
-/** The headline enters word by word; NISAR keeps the mono face of a measured value. */
-const HERO_TITLE = [
-  ["Mapas", "de", "cambio"],
-  ["del", "terreno"],
-  ["con", "el", "radar", "NISAR"],
-];
+/** The headline enters word by word, one line per "|"; NISAR keeps the mono face of a measured value. */
+function heroTitle(text: string): string[][] {
+  return text.split("|").map((line) => line.trim().split(/\s+/));
+}
 
 const FILTERS = [
-  { id: "ALL", label: "Todos" },
-  { id: "DONE", label: "Listos" },
-  { id: "CHANGED", label: "Cambios" },
-  { id: "ACTIVE", label: "En curso" },
+  { id: "ALL", label: "home.filter.all" },
+  { id: "DONE", label: "home.filter.done" },
+  { id: "CHANGED", label: "home.filter.changed" },
+  { id: "ACTIVE", label: "home.filter.active" },
 ] as const;
 
 type FilterId = (typeof FILTERS)[number]["id"];
@@ -140,6 +132,7 @@ function loadMoments(): Promise<MomentsModule> {
  * The three figures underneath arrive together the first time they are seen.
  */
 function Statement() {
+  const t = useT();
   const section = useRef<HTMLElement | null>(null);
   const facts = useInView<HTMLDListElement>();
 
@@ -168,27 +161,26 @@ function Statement() {
       <div className="radar" aria-hidden="true" />
       <div className="wrap">
         <h2 id="statement-h" className="mo-wh__text">
-          El radar ve de noche y a través de las nubes. Dos pasadas separadas por doce días bastan para saber dónde{" "}
-          <strong>cambió el terreno.</strong>
+          {t("home.statement.lead")} <strong>{t("home.statement.strong")}</strong>
         </h2>
         <dl className="facts-row" ref={facts.ref} data-in={facts.inView ? "true" : undefined}>
           <div>
             <dt className="num">
-              <CountUp to={12} active={facts.inView} /> días
+              <CountUp to={12} active={facts.inView} /> {t("home.unit.days")}
             </dt>
-            <dd>entre una pasada de NISAR y la siguiente sobre el mismo lugar</dd>
+            <dd>{t("home.fact.revisit")}</dd>
           </div>
           <div>
             <dt className="num">
               <CountUp to={10} active={facts.inView} /> m
             </dt>
-            <dd>de lado mide cada píxel de la imagen que se compara</dd>
+            <dd>{t("home.fact.pixel")}</dd>
           </div>
           <div>
             <dt className="num">
               <CountUp to={24} active={facts.inView} /> cm
             </dt>
-            <dd>de longitud de onda: la banda L atraviesa nubes, humo y follaje ligero</dd>
+            <dd>{t("home.fact.wavelength")}</dd>
           </div>
         </dl>
       </div>
@@ -198,6 +190,9 @@ function Statement() {
 
 export function HomePage() {
   const navigate = useNavigate();
+  const t = useT();
+  const locale = useLocale((state) => state.locale);
+  const title = heroTitle(t("home.hero.title"));
   const [all, setAll] = useState(false);
   const [filter, setFilter] = useState<FilterId>("ALL");
   const saved = useInView<HTMLElement>();
@@ -285,11 +280,11 @@ export function HomePage() {
           <div className="copy hero-text">
             <p className="hero-kicker">
               <Satellite size={14} aria-hidden="true" />
-              NISAR · banda L · 12 días de revisita
+              {t("home.hero.kicker")}
             </p>
             <h1 className="hero-title">
-              {HERO_TITLE.map((line, lineIndex) => {
-                const before = HERO_TITLE.slice(0, lineIndex).reduce((total, words) => total + words.length, 0);
+              {title.map((line, lineIndex) => {
+                const before = title.slice(0, lineIndex).reduce((total, words) => total + words.length, 0);
                 return (
                   <span className="hl" key={lineIndex}>
                     {line.map((word, wordIndex) => (
@@ -302,7 +297,7 @@ export function HomePage() {
                             {word}
                           </span>
                         </span>
-                        {lineIndex < HERO_TITLE.length - 1 || wordIndex < line.length - 1 ? " " : null}
+                        {lineIndex < title.length - 1 || wordIndex < line.length - 1 ? " " : null}
                       </Fragment>
                     ))}
                   </span>
@@ -310,25 +305,28 @@ export function HomePage() {
               })}
             </h1>
             <p className="lead">
-              Elige una zona y dos fechas. Voraxis compara las dos pasadas del satélite y marca qué se inundó, se
-              quemó o perdió vegetación.
+              {t("home.hero.lead")}
             </p>
             <div className="actions">
               <Link className="btn" to="/nuevo">
-                Crear un análisis
+                {t("shell.footer.cta")}
               </Link>
               {featured ? (
                 <Link className="btn tonal" to={`/analisis/${featured.id}`}>
-                  Ver el último análisis
+                  {t("home.hero.latest")}
                 </Link>
               ) : null}
             </div>
             {featured && top && featuredPlace ? (
               <Link className="proof proof-link" to={`/analisis/${featured.id}`}>
                 <span>
-                  En {featuredPlace.name}: {area(top.area_km2)} de{" "}
-                  {typeStyle(top.change_type).label.toLowerCase()} entre el {shortDate(before)} y el{" "}
-                  {shortDate(after, true)}.
+                  {t("home.hero.proof", {
+                    place: featuredPlace.name,
+                    area: area(top.area_km2),
+                    type: typeStyle(top.change_type).label.toLowerCase(),
+                    from: shortDate(before),
+                    to: shortDate(after, true),
+                  })}
                 </span>
                 <svg width="18" height="12" viewBox="0 0 18 12" fill="none" aria-hidden="true">
                   <path
@@ -342,7 +340,7 @@ export function HomePage() {
               </Link>
             ) : (
               <p className="proof">
-                NISAR repite cada pasada a los 12 días y mide el terreno en píxeles de 10 metros.
+                {t("home.hero.proof_empty")}
               </p>
             )}
           </div>
@@ -350,9 +348,9 @@ export function HomePage() {
           <div className="art" ref={art}>
             <div className="window">
               <div className="bar-top">
-                <strong>{featuredPlace?.name ?? "Zona de estudio"}</strong>
+                <strong>{featuredPlace?.name ?? t("home.window.zone")}</strong>
                 <span className="label">
-                  {before && after ? `${shortDate(before)} a ${shortDate(after, true)}` : "Dos pasadas del radar"}
+                  {before && after ? t("home.range", { from: shortDate(before), to: shortDate(after, true) }) : t("home.window.passes")}
                 </span>
               </div>
               {featured && tiles.data && before && after ? (
@@ -381,13 +379,13 @@ export function HomePage() {
                   {typeStyle(top.change_type).label}
                 </span>
                 <p className="value">{area(top.area_km2)}</p>
-                <p className="label">en {number(top.count, 0)} áreas detectadas</p>
+                <p className="label">{t("home.result.areas", { count: number(top.count, 0) })}</p>
                 <dl>
-                  <dt>Cambio medio de la señal</dt>
+                  <dt>{t("home.result.mean_change")}</dt>
                   <dd className="num">{signedDb(top.mean_change_db)}</dd>
                   {rain?.total_mm != null ? (
                     <>
-                      <dt>Lluvia en el intervalo</dt>
+                      <dt>{t("home.result.rain")}</dt>
                       <dd className="num">{number(rain.total_mm, 0)} mm</dd>
                     </>
                   ) : null}
@@ -398,28 +396,29 @@ export function HomePage() {
         </div>
 
         <div className="hero-rail">
-          <dl className="hero-rail-in" aria-label="Estado del observatorio">
+          <dl className="hero-rail-in" aria-label={t("home.rail.aria")}>
             <div>
-              <dt>Análisis</dt>
+              <dt>{t("home.stat.analyses")}</dt>
               <dd className="num">{number(summary.total, 0)}</dd>
             </div>
             <div>
-              <dt>Cambios detectados</dt>
+              <dt>{t("home.stat.changes")}</dt>
               <dd className="num">{number(summary.changes, 0)}</dd>
             </div>
             <div>
-              <dt>Última zona</dt>
-              <dd>{featuredPlace?.name ?? "Sin análisis"}</dd>
+              <dt>{t("home.rail.latest")}</dt>
+              <dd>{featuredPlace?.name ?? t("home.rail.none")}</dd>
             </div>
             <div>
-              <dt>Revisita</dt>
-              <dd className="num">12 días</dd>
+              <dt>{t("home.rail.revisit")}</dt>
+              <dd className="num">12 {t("home.unit.days")}</dd>
             </div>
           </dl>
         </div>
       </section>
 
-      <Statement />
+      {/* The word-highlight moment wraps the words it finds: a new language mounts it again. */}
+      <Statement key={locale} />
 
       <section
         className="saved"
@@ -431,28 +430,30 @@ export function HomePage() {
         <div className="wrap">
           <div className="head">
             <div>
-              <h2 id="analisis-h">Análisis guardados</h2>
+              <h2 id="analisis-h">{t("shell.footer.saved")}</h2>
               <p className="live" data-on={jobs.isFetching ? "true" : undefined}>
                 <i aria-hidden="true" />
-                {jobs.isError
-                  ? "Sin conexión con la API"
-                  : jobs.isLoading
-                    ? "Cargando análisis…"
-                    : jobs.isFetching
-                      ? "Actualizando…"
-                      : "Se actualiza cada 10 segundos"}
+                {t(
+                  jobs.isError
+                    ? "home.live.offline"
+                    : jobs.isLoading
+                      ? "home.live.loading"
+                      : jobs.isFetching
+                        ? "home.live.updating"
+                        : "home.live.idle",
+                )}
               </p>
             </div>
             <Link className="btn tonal" to="/nuevo">
-              Nuevo análisis
+              {t("shell.footer.new")}
             </Link>
           </div>
 
           {jobs.isError ? (
             <p className="notice problem">
-              La API no responde. Comprueba que el backend esté encendido y recarga la página.{" "}
+              {t("home.api_down")}{" "}
               <button className="linkbtn" onClick={() => jobs.refetch()}>
-                Reintentar
+                {t("action.retry")}
               </button>
             </p>
           ) : null}
@@ -461,40 +462,40 @@ export function HomePage() {
             <div className="empty">
               <Satellite size={20} aria-hidden="true" />
               <div>
-                <p style={{ fontWeight: 500 }}>Todavía no hay análisis</p>
+                <p style={{ fontWeight: 500 }}>{t("home.empty.title")}</p>
                 <p className="quiet" style={{ marginTop: 4 }}>
-                  Elige una zona y dos fechas del radar. El primero tarda unos minutos en descargarse.
+                  {t("home.empty.body")}
                 </p>
               </div>
               <Link className="btn" to="/nuevo">
-                Crear un análisis
+                {t("shell.footer.cta")}
               </Link>
             </div>
           ) : null}
 
           {jobs.data && jobs.data.length > 0 ? (
             <>
-              <dl className="stats" aria-label="Resumen de los análisis guardados">
+              <dl className="stats" aria-label={t("home.stats.aria")}>
                 <div>
-                  <dt>Análisis</dt>
+                  <dt>{t("home.stat.analyses")}</dt>
                   <dd className="num">
                     <CountUp to={summary.total} active={saved.inView} />
                   </dd>
                 </div>
                 <div>
-                  <dt>Completados</dt>
+                  <dt>{t("home.stat.completed")}</dt>
                   <dd className="num">
                     <CountUp to={summary.completed} active={saved.inView} />
                   </dd>
                 </div>
                 <div>
-                  <dt>Cambios detectados</dt>
+                  <dt>{t("home.stat.changes")}</dt>
                   <dd className="num">
                     <CountUp to={summary.changes} active={saved.inView} duration={1200} />
                   </dd>
                 </div>
                 <div>
-                  <dt>En curso</dt>
+                  <dt>{t("home.stat.active")}</dt>
                   <dd className="num">
                     <CountUp to={summary.active} active={saved.inView} />
                   </dd>
@@ -505,7 +506,7 @@ export function HomePage() {
                 <div
                   className="segmented"
                   role="group"
-                  aria-label="Filtrar análisis"
+                  aria-label={t("home.filter.aria")}
                   style={
                     {
                       "--n": FILTERS.length,
@@ -522,7 +523,7 @@ export function HomePage() {
                         setAll(false);
                       }}
                     >
-                      {option.label}
+                      {t(option.label)}
                       <span className="tab-count">{number(counts[option.id], 0)}</span>
                     </button>
                   ))}
@@ -531,9 +532,9 @@ export function HomePage() {
 
               {filtered.length === 0 ? (
                 <p className="notice">
-                  No hay análisis con este filtro.{" "}
+                  {t("home.filter.none")}{" "}
                   <button className="linkbtn" onClick={() => setFilter("ALL")}>
-                    Ver todos
+                    {t("home.filter.see_all")}
                   </button>
                 </p>
               ) : (
@@ -541,11 +542,11 @@ export function HomePage() {
                   <table className="runs">
                     <thead>
                       <tr>
-                        <th>Zona</th>
-                        <th>Fechas comparadas</th>
-                        <th>Áreas con cambio</th>
-                        <th>Cambio más frecuente</th>
-                        <th>Estado</th>
+                        <th>{t("home.table.zone")}</th>
+                        <th>{t("home.table.dates")}</th>
+                        <th>{t("home.table.areas")}</th>
+                        <th>{t("home.table.top")}</th>
+                        <th>{t("home.table.status")}</th>
                         <th aria-hidden="true" />
                       </tr>
                     </thead>
@@ -568,12 +569,14 @@ export function HomePage() {
                             }}
                           >
                             <td>
-                              <span className="place">{location?.name ?? "Zona sin nombre"}</span>
+                              <span className="place">{location?.name ?? t("home.table.unnamed")}</span>
                               {location?.country ? <span className="quiet"> {location.country}</span> : null}
                             </td>
                             <td>
-                              {shortDate(date.get(job.before_observation_id))} a{" "}
-                              {shortDate(date.get(job.after_observation_id), true)}
+                              {t("home.range", {
+                                from: shortDate(date.get(job.before_observation_id)),
+                                to: shortDate(date.get(job.after_observation_id), true),
+                              })}
                             </td>
                             <td>
                               {job.status === "COMPLETED" ? (
@@ -608,7 +611,7 @@ export function HomePage() {
                                 </span>
                               ) : null}
                             </td>
-                            <td className="quiet">{STATUS[job.status] ?? job.status}</td>
+                            <td className="quiet">{t(`home.status.${job.status}`, null, job.status)}</td>
                             <td style={{ textAlign: "right" }}>
                               <span className="go" aria-hidden="true">
                                 <svg width="18" height="12" viewBox="0 0 18 12" fill="none">
@@ -629,7 +632,7 @@ export function HomePage() {
                   </table>
                   {remaining > 0 ? (
                     <button className="btn tonal" style={{ marginTop: 24 }} onClick={() => setAll(!all)}>
-                      {all ? "Mostrar menos análisis" : `Mostrar los ${remaining} análisis restantes`}
+                      {all ? t("home.show_less") : t("home.show_more", { count: remaining })}
                     </button>
                   ) : null}
                 </div>

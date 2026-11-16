@@ -5,6 +5,7 @@
  */
 import { useSyncExternalStore } from "react";
 
+import { t, useT } from "@/i18n";
 import type { Map as MapLibreMap, RasterSourceSpecification } from "@/observatory/maplibre";
 
 export type BasemapId = "gris" | "satelite" | "nasa";
@@ -25,29 +26,29 @@ const PLACES = `${ESRI}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}
 
 export const BASEMAPS: Record<BasemapId, Basemap> = {
   gris: {
-    label: "Gris",
+    label: "basemap.gris",
     tiles: `${ESRI}/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`,
     labels: `${ESRI}/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`,
     maxzoom: 15,
-    attribution: "Mapa base: Esri, HERE, Garmin, © OpenStreetMap",
+    attribution: "basemap.credit.gris",
     ink: "#232323",
   },
   satelite: {
-    label: "Satélite",
+    label: "basemap.satelite",
     tiles: `${ESRI}/World_Imagery/MapServer/tile/{z}/{y}/{x}`,
     labels: PLACES,
     maxzoom: 17,
-    attribution: "Imagen: Esri, Maxar, Earthstar Geographics",
+    attribution: "basemap.credit.satelite",
     ink: "#ffffff",
   },
   nasa: {
-    label: "NASA",
+    label: "basemap.nasa",
     // The same Blue Marble that Earthdata Search and Worldview open with (GIBS, no key).
     tiles:
       "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg",
     labels: PLACES,
     maxzoom: 8,
-    attribution: "Blue Marble: NASA Earth Observatory, vía NASA GIBS",
+    attribution: "basemap.credit.nasa",
     ink: "#ffffff",
   },
 };
@@ -63,7 +64,7 @@ export function basemapSources(id: BasemapId, extraAttribution = ""): Record<"ba
       tiles: [map.tiles],
       tileSize: 256,
       maxzoom: map.maxzoom,
-      attribution: extraAttribution ? `${map.attribution} | ${extraAttribution}` : map.attribution,
+      attribution: extraAttribution ? `${t(map.attribution)} | ${extraAttribution}` : t(map.attribution),
     },
     // Labels come from Esri at full detail whatever the imagery underneath.
     labels: { type: "raster", tiles: [map.labels], tileSize: 256, maxzoom: 15 },
@@ -123,11 +124,12 @@ export function useBasemap(): BasemapId {
 /** Three options over the map, bottom right above the credits. */
 export function BasemapSwitch() {
   const value = useBasemap();
+  const t = useT();
   return (
-    <div className="basemap" role="group" aria-label="Mapa base">
+    <div className="basemap" role="group" aria-label={t("basemap.aria")}>
       {ORDER.map((id) => (
         <button key={id} type="button" aria-pressed={value === id} onClick={() => setBasemap(id)}>
-          {BASEMAPS[id].label}
+          {t(BASEMAPS[id].label)}
         </button>
       ))}
     </div>

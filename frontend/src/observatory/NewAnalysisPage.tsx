@@ -4,7 +4,8 @@ import { Map as MapLibreMap, NavigationControl, type GeoJSONSource } from "@/obs
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import { DEFAULT_MULTILOOK, STAGE, downloadedText, failureText, jobForPair, launchAnalysis, useIngestTasks, useJobs } from "@/observatory/downloads";
+import { t, useT } from "@/i18n";
+import { DEFAULT_MULTILOOK, downloadedText, failureText, jobForPair, launchAnalysis, stageLabel, useIngestTasks, useJobs } from "@/observatory/downloads";
 import { boundsCenter, geometryBounds, number, shortDate } from "@/observatory/lib";
 import { ApiError } from "@/services/api";
 import { contextService } from "@/services/context.service";
@@ -15,11 +16,12 @@ import type { IngestTask } from "@/types/ingest";
 
 function message(error: unknown): string {
   if (error instanceof ApiError) return error.message;
-  return error instanceof Error ? error.message : "Ocurrió un error inesperado.";
+  return error instanceof Error ? error.message : t("error.unexpected");
 }
 
 export function NewAnalysisPage() {
   const navigate = useNavigate();
+  const t = useT();
   const queryClient = useQueryClient();
   const container = useRef<HTMLDivElement | null>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -86,7 +88,11 @@ export function NewAnalysisPage() {
     if (params.get("lat") && Number.isFinite(lat) && Number.isFinite(lon)) {
       instance.jumpTo({ center: [lon, lat], zoom: 9.2 });
       setCreating(true);
-      setName(`Zona en ${number(Math.abs(lat), 2)}° ${lat >= 0 ? "N" : "S"}, ${number(Math.abs(lon), 2)}° ${lon >= 0 ? "E" : "O"}`);
+      setName(
+        t("wizard.zone_at", {
+          coords: `${number(Math.abs(lat), 2)}° ${lat >= 0 ? "N" : "S"}, ${number(Math.abs(lon), 2)}° ${lon >= 0 ? "E" : t("explore.west")}`,
+        }),
+      );
     }
     map.current = instance;
     return () => {
@@ -140,13 +146,8 @@ export function NewAnalysisPage() {
       setName("");
       setPair(null);
     } catch (error) {
-      setProblem(
-        message(error).includes("maximum is 3")
-          ? "La vista del mapa es demasiado grande. Acércate hasta ver un área de unos 300 km de lado como máximo y vuelve a intentarlo."
-          : message(error).includes("already exists")
-            ? "Ya hay una zona con ese nombre. Elige otro."
-            : message(error),
-      );
+      // The API words most problems; a map view that is too large needs the map-specific hint.
+      setProblem(error instanceof ApiError && error.code === "location_too_large" ? t("wizard.zone_too_large") : message(error));
     }
   }
 
@@ -205,18 +206,18 @@ export function NewAnalysisPage() {
     <div className="wizard">
       <div className="steps">
         <div className="block">
-          <h1 className="title">Nuevo análisis</h1>
+          <h1 className="title">{t("shell.footer.new")}</h1>
           <p className="quiet" style={{ marginTop: 10 }}>
-            Elige una zona y dos pasadas del radar. Voraxis descarga las imágenes, las compara y te lleva al resultado.
+            {t("wizard.lead")}
           </p>
         </div>
 
         <div className={`block step${location ? " done" : ""}`}>
           <span className="n">1</span>
           <div>
-          <h2>La zona</h2>
+          <h2>{t("wizard.zone.title")}</h2>
           <label className="field">
-            Zonas guardadas
+            {t("wizard.zone.saved")}
             <select
               value={locationId}
               disabled={running}
@@ -226,7 +227,7 @@ export function NewAnalysisPage() {
                 setProblem(null);
               }}
             >
-              <option value="">Elige una zona…</option>
+              <option value="">{t("wizard.zone.pick")}</option>
               {(locations.data ?? []).map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
@@ -238,19 +239,19 @@ export function NewAnalysisPage() {
 
           {creating ? (
             <div style={{ display: "grid", gap: "0.6rem", marginTop: "0.9rem" }}>
-              <p className="quiet">Mueve y acerca el mapa hasta encuadrar la zona. Se guardará lo que se ve ahora.</p>
+              <p className="quiet">{t("wizard.zone.frame")}</p>
               <label className="field">
-                Nombre de la zona
-                <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Por ejemplo, Costa de Machilipatnam" />
+                {t("wizard.zone.name")}
+                <input value={name} onChange={(event) => setName(event.target.value)} placeholder={t("wizard.zone.placeholder")} />
               </label>
               <div style={{ display: "flex", gap: "0.5rem" }}>
-                <button className="btn small" disabled={!name.trim()} onClick={createZone}>Guardar esta vista como zona</button>
-                <button className="btn tonal small" onClick={() => setCreating(false)}>Cancelar</button>
+                <button className="btn small" disabled={!name.trim()} onClick={createZone}>{t("wizard.zone.save")}</button>
+                <button className="btn tonal small" onClick={() => setCreating(false)}>{t("action.cancel")}</button>
               </div>
             </div>
           ) : (
             <button className="btn tonal small" style={{ marginTop: 12 }} disabled={running} onClick={() => setCreating(true)}>
-              Crear una zona nueva en el mapa
+              {t("wizard.zone.new")}
             </button>
           )}
           </div>
@@ -259,15 +260,15 @@ export function NewAnalysisPage() {
         <div className={`block step${pair ? " done" : ""}`}>
           <span className="n">2</span>
           <div>
-          <h2>Las dos fechas</h2>
-          {!location ? <p className="quiet">Primero elige una zona.</p> : null}
-          {location && coverage.isLoading ? <p className="quiet">Buscando pasadas de NISAR sobre la zona…</p> : null}
+          <h2>{t("wizard.dates.title")}</h2>
+          {!location ? <p className="quiet">{t("wizard.dates.first")}</p> : null}
+          {location && coverage.isLoading ? <p className="quiet">{t("wizard.dates.loading")}</p> : null}
           {location && coverage.isError ? (
-            <p className="notice problem">El catálogo de NASA no respondió. Espera un momento y vuelve a elegir la zona.</p>
+            <p className="notice problem">{t("wizard.dates.error")}</p>
           ) : null}
           {location && coverage.data && pairs.length === 0 ? (
             <p className="notice">
-              NISAR no tiene dos pasadas comparables sobre el centro de esta zona en los últimos 120 días. Prueba con otra zona.
+              {t("wizard.dates.none")}
             </p>
           ) : null}
           <div style={{ display: "grid", gap: "0.5rem" }}>
@@ -277,12 +278,12 @@ export function NewAnalysisPage() {
               return (
                 <button key={key} className="pairrow" aria-pressed={chosen} disabled={running} onClick={() => setPair(option)}>
                   <span className="when">
-                    {shortDate(option.before.start)} a {shortDate(option.after.start, true)}
+                    {t("home.range", { from: shortDate(option.before.start), to: shortDate(option.after.start, true) })}
                   </span>
                   <span className="num label">{number(option.download_gb, 1)} GB</span>
                   <span className="label" style={{ gridColumn: "1 / -1" }}>
-                    {number(option.interval_days, 0)} días de diferencia, órbita {option.track}
-                    {option.same_processing_version ? "" : ", procesadas con versiones distintas"}
+                    {t("wizard.dates.detail", { days: number(option.interval_days, 0), track: option.track })}
+                    {option.same_processing_version ? "" : t("wizard.dates.versions")}
                   </span>
                 </button>
               );
@@ -294,23 +295,23 @@ export function NewAnalysisPage() {
         <div className="block step">
           <span className="n">3</span>
           <div>
-          <h2>Descargar y comparar</h2>
+          <h2>{t("wizard.run.title")}</h2>
           {tasks.length === 0 ? (
             <p className="quiet">
-              La descarga puede tardar varios minutos por imagen la primera vez. Si ya están descargadas, son unos segundos.
+              {t("wizard.run.hint")}
             </p>
           ) : (
             <p className="quiet" style={{ marginBottom: "0.9rem" }}>
-              Puedes salir de esta pantalla: la descarga sigue en el servidor y la ves en Descargas, arriba a la derecha.
+              {t("wizard.run.leave")}
             </p>
           )}
           <div style={{ display: "grid", gap: "0.8rem", marginBottom: tasks.length ? "0.9rem" : 0 }}>
             {tasks.map((task, index) => (
               <div key={task.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}>
-                  <span>{index === 0 ? "Imagen de antes" : "Imagen de después"}</span>
+                  <span>{t(index === 0 ? "wizard.run.before" : "wizard.run.after")}</span>
                   <span className="quiet">
-                    {task.status === "FAILED" ? "Falló" : STAGE[task.stage ?? "QUEUED"]}
+                    {task.status === "FAILED" ? t("downloads.failed") : stageLabel(task.stage)}
                     {downloadedText(task) ? `, ${downloadedText(task)}` : ""}
                   </span>
                 </div>
@@ -320,7 +321,7 @@ export function NewAnalysisPage() {
           </div>
           {problem ? <p className="notice problem" style={{ marginBottom: "0.8rem" }}>{problem}</p> : null}
           <button className="btn" disabled={!location || !pair || running} onClick={run}>
-            {running ? "Preparando las imágenes…" : "Descargar y comparar"}
+            {running ? t("wizard.run.preparing") : t("wizard.run.title")}
           </button>
           </div>
         </div>

@@ -239,6 +239,7 @@
 .navlink {
   position: relative;
   padding: 6px 0;
+  white-space: nowrap;
   font-size: 15px;
   text-decoration: none;
   color: var(--color-muted);
@@ -2822,5 +2823,43 @@ html.m-enter .runs-wrap[data-in] .runs tbody tr {
 
   .saved .live[data-on] i {
     animation: none;
+  }
+}
+
+/* Language: the same segmented control, sized for the header. */
+.segmented.lang {
+  flex: none;
+  padding: 3px;
+}
+
+.segmented.lang::before {
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--n));
+}
+
+.segmented.lang button {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+/* With the language switch the header needs ~1100px: below that it scrolls sideways, as on phones. */
+@media (max-width: 1120px) {
+  .nav-in {
+    gap: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .nav-in::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav .links {
+    flex: none;
+    gap: 20px;
   }
 }

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
+import { useT } from "@/i18n";
+import { Rich } from "@/i18n/Rich";
 import { area, number, shortDate, typeStyle } from "@/observatory/lib";
 import { insightsService } from "@/services/insights.service";
 
@@ -32,12 +34,13 @@ function Bars({
 }
 
 export function InsightsPage() {
+  const t = useT();
   const insights = useQuery({ queryKey: ["insights"], queryFn: () => insightsService.summary() });
 
   if (insights.isLoading) {
     return (
       <div className="page">
-        <div className="inner quiet">Contando lo que hay…</div>
+        <div className="inner quiet">{t("insights.loading")}</div>
       </div>
     );
   }
@@ -46,9 +49,9 @@ export function InsightsPage() {
     return (
       <div className="page">
         <div className="inner">
-          <p className="notice problem">No se pudieron cargar las estadísticas.</p>
+          <p className="notice problem">{t("insights.error")}</p>
           <button className="btn tonal" style={{ marginTop: 16 }} onClick={() => insights.refetch()}>
-            Reintentar
+            {t("action.retry")}
           </button>
         </div>
       </div>
@@ -63,69 +66,69 @@ export function InsightsPage() {
   return (
     <div className="page">
       <div className="inner wide">
-        <p className="label">Global insights</p>
-        <h1 className="title">Qué se ha encontrado hasta ahora</h1>
+        <p className="label">{t("insights.kicker")}</p>
+        <h1 className="title">{t("insights.title")}</h1>
         <p className="quiet" style={{ marginTop: 12 }}>
-          Todas las cifras salen de los análisis guardados en este servidor. No se proyectan ni se estiman valores
-          ausentes.
+          {t("insights.lead")}
         </p>
 
         <dl className="facts wide" style={{ marginTop: 28 }}>
           <div>
-            <dt>Regiones registradas</dt>
+            <dt>{t("insights.fact.locations")}</dt>
             <dd className="num">{number(data.locations, 0)}</dd>
           </div>
           <div>
-            <dt>Escenas NISAR en catálogo</dt>
+            <dt>{t("insights.fact.scenes")}</dt>
             <dd className="num">{number(data.scenes, 0)}</dd>
           </div>
           <div>
-            <dt>Observaciones listas</dt>
+            <dt>{t("insights.fact.observations")}</dt>
             <dd className="num">{number(data.observations, 0)}</dd>
           </div>
           <div>
-            <dt>Análisis completados</dt>
+            <dt>{t("insights.fact.completed")}</dt>
             <dd className="num">
               {number(completed, 0)}
-              <span className="quiet"> de {number(analyses, 0)}</span>
+              <span className="quiet"> {t("insights.of", { total: number(analyses, 0) })}</span>
             </dd>
           </div>
           <div>
-            <dt>Cambios detectados</dt>
+            <dt>{t("home.stat.changes")}</dt>
             <dd className="num">{number(data.change_events, 0)}</dd>
           </div>
           <div>
-            <dt>Área con cambios</dt>
+            <dt>{t("insights.fact.area")}</dt>
             <dd className="num">{area(data.change_area_km2)}</dd>
           </div>
           <div>
-            <dt>Evidencias vinculadas</dt>
+            <dt>{t("insights.fact.evidence")}</dt>
             <dd className="num">{number(data.evidence_records, 0)}</dd>
           </div>
           <div>
-            <dt>Eventos auxiliares guardados</dt>
+            <dt>{t("insights.fact.events")}</dt>
             <dd className="num">{number(data.auxiliary_events, 0)}</dd>
           </div>
         </dl>
 
         {!enough ? (
           <div className="block" style={{ marginTop: 32 }}>
-            <h2>Datos insuficientes para tendencias</h2>
+            <h2>{t("insights.thin.title")}</h2>
             <p className="quiet" style={{ marginTop: 10 }}>
-              Hay {number(completed, 0)} {completed === 1 ? "análisis completado" : "análisis completados"}. Con menos
-              de {MIN_ANALYSES} cualquier distribución describiría el puñado de zonas elegidas, no el planeta. Cuando
-              haya más, aquí aparecerán las gráficas.
+              {t(completed === 1 ? "insights.thin.body_one" : "insights.thin.body", {
+                count: number(completed, 0),
+                min: MIN_ANALYSES,
+              })}
             </p>
             <Link className="btn tonal" style={{ marginTop: 16 }} to="/nuevo">
-              Crear otro análisis
+              {t("insights.thin.cta")}
             </Link>
           </div>
         ) : (
           <>
             <section className="block" aria-labelledby="por-tipo">
-              <h2 id="por-tipo">Cambios por clasificación</h2>
+              <h2 id="por-tipo">{t("insights.type.title")}</h2>
               <p className="quiet" style={{ marginTop: 8 }}>
-                Las etiquetas <span className="num">POSSIBLE_*</span> son hipótesis del clasificador, no diagnósticos.
+                <Rich text={t("insights.type.note")} />
               </p>
               <Bars
                 rows={data.by_type.map((row) => ({
@@ -139,15 +142,14 @@ export function InsightsPage() {
             </section>
 
             <section className="block" aria-labelledby="por-direccion">
-              <h2 id="por-direccion">Dirección de la señal</h2>
+              <h2 id="por-direccion">{t("insights.direction.title")}</h2>
               <p className="quiet" style={{ marginTop: 8 }}>
-                Oscurecimiento: la superficie devolvió menos señal (agua, suelo liso). Aclaramiento: devolvió más
-                (estructuras, rebote doble).
+                {t("insights.direction.note")}
               </p>
               <Bars
                 rows={data.by_direction.map((row) => ({
                   key: row.direction ?? "unknown",
-                  label: row.direction === "DECREASE" ? "Se oscureció" : row.direction === "INCREASE" ? "Se aclaró" : "Sin dirección",
+                  label: t(row.direction === "DECREASE" ? "insights.direction.darker" : row.direction === "INCREASE" ? "insights.direction.brighter" : "insights.direction.none"),
                   value: row.count,
                   note: `${number(row.count, 0)} · ${area(row.area_km2)}`,
                   color: row.direction === "DECREASE" ? "var(--color-darker)" : "var(--color-brighter)",
@@ -157,9 +159,9 @@ export function InsightsPage() {
 
             {data.by_month.length > 1 ? (
               <section className="block" aria-labelledby="por-mes">
-                <h2 id="por-mes">Por mes de análisis</h2>
+                <h2 id="por-mes">{t("insights.month.title")}</h2>
                 <p className="quiet" style={{ marginTop: 8 }}>
-                  Fecha en que se procesó el análisis, no la fecha de la observación.
+                  {t("insights.month.note")}
                 </p>
                 <Bars
                   rows={data.by_month.map((row) => ({
@@ -174,7 +176,7 @@ export function InsightsPage() {
             ) : null}
 
             <section className="block" aria-labelledby="por-region">
-              <h2 id="por-region">Por región</h2>
+              <h2 id="por-region">{t("insights.region.title")}</h2>
               <Bars
                 rows={data.by_location.map((row) => ({
                   key: row.location_id,
